@@ -241,7 +241,9 @@ struct TranscriptionSettings: View {
 
     private func confirmRemove() async {
         do {
-            freedBytes = try model.deleteModel()
+            let removedModel = model
+            freedBytes = try removedModel.deleteModel()
+            await FluidParakeetModelCache.shared.evict(removedModel)
             pendingRemove = false
             await refresh()
         } catch {

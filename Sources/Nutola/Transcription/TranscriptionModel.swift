@@ -22,7 +22,7 @@ enum TranscriptionModel: String, CaseIterable, Identifiable, Hashable {
         case .apple:
             "Apple's built-in live and batch speech recognition."
         case .parakeetRedux:
-            "Multilingual (includes Italian). Compact Core ML model (~220 MB). Live uses overlapping windows; final audio is transcribed again."
+            "Multilingual (includes Italian). Compact Core ML model (~220 MB). Runs on the complete audio after recording. Live preview uses Apple Speech."
         case .parakeetUltra:
             "Multilingual (includes Italian). Larger Core ML model (~630 MB), optimized for accuracy. Live uses overlapping windows; final audio is transcribed again."
         }
@@ -30,7 +30,7 @@ enum TranscriptionModel: String, CaseIterable, Identifiable, Hashable {
 
     var isDownloadable: Bool { self != .apple }
     var isAvailable: Bool { true }
-    var supportsLiveTranscription: Bool { true }
+    var supportsLiveTranscription: Bool { self == .apple }
     var isModelInstalled: Bool { FluidParakeetModels.isInstalled(self) }
 
     var modelInstalledBytes: Int64 { FluidParakeetModels.installedBytes(self) }

@@ -151,6 +151,11 @@ actor FluidParakeetModelCache {
     static let shared = FluidParakeetModelCache()
     private var loaded: [TranscriptionModel: AsrModels] = [:]
 
+    /// Release the in-memory model after a user explicitly removes its files.
+    func evict(_ model: TranscriptionModel) {
+        loaded.removeValue(forKey: model)
+    }
+
     func get(_ model: TranscriptionModel) async throws -> AsrModels {
         if let hit = loaded[model] { return hit }
         guard model != .apple else { throw TranscriberError.modelUnavailable }

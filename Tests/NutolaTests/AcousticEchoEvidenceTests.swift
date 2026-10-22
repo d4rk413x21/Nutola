@@ -38,17 +38,20 @@ final class AcousticEchoEvidenceTests: XCTestCase {
             .appendingPathComponent("nutola-echo-test-\(UUID().uuidString).wav")
         defer { try? FileManager.default.removeItem(at: url) }
         let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
-        let file = try AVAudioFile(forWriting: url, settings: format.settings)
-        let frameCount = 96_000
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frameCount))!
-        buffer.frameLength = AVAudioFrameCount(frameCount)
-        let channel = buffer.floatChannelData![0]
-        for index in 0..<frameCount {
-            let bin = index / 960
-            let amplitude = Float(0.01 + 0.08 * abs(sin(Double(bin) * 0.38)))
-            channel[index] = amplitude * Float(sin(Double(index) * 0.07))
+        do {
+            let file = try AVAudioFile(forWriting: url, settings: format.settings)
+            let frameCount = 96_000
+            let buffer = AVAudioPCMBuffer(
+                pcmFormat: format, frameCapacity: AVAudioFrameCount(frameCount))!
+            buffer.frameLength = AVAudioFrameCount(frameCount)
+            let channel = buffer.floatChannelData![0]
+            for index in 0..<frameCount {
+                let bin = index / 960
+                let amplitude = Float(0.01 + 0.08 * abs(sin(Double(bin) * 0.38)))
+                channel[index] = amplitude * Float(sin(Double(index) * 0.07))
+            }
+            try file.write(from: buffer)
         }
-        try file.write(from: buffer)
         // Drop the writer before reopening the same WAV as a reader.
         let evidence = try AcousticEchoEvidence.load(microphoneURL: url, systemURL: url)
         XCTAssertGreaterThan(evidence.microphone.count, 90)

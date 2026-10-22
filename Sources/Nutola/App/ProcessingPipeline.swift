@@ -201,13 +201,30 @@ enum ProcessingPipeline {
             NutolaConsoleLog.pipeline("using diarization only (\(diarizedTurns.count) turns)")
         }
 
+        // Inspect the recorded audio before attributing microphone duplicates
+        // to the local speaker. Errors leave the original transcript intact.
+        let echoEvidence: AcousticEchoEvidence?
+        if micOut != nil && systemOut != nil {
+            do {
+                echoEvidence = try AcousticEchoEvidence.load(
+                    microphoneURL: micURL, systemURL: systemURL)
+            } catch {
+                echoEvidence = nil
+                NutolaConsoleLog.pipeline(
+                    "acoustic echo check unavailable — \(error.localizedDescription)")
+            }
+        } else {
+            echoEvidence = nil
+        }
+
         let myName = NSFullUserName().isEmpty ? "Me" : NSFullUserName()
         let (segments, speakers) = SpeakerLabeler.label(
             mic: micOut,
             system: systemOut,
             systemTurns: turns,
             myName: myName,
-            namedSpeakers: namedSpeakers)
+            namedSpeakers: namedSpeakers,
+            echoEvidence: echoEvidence)
         let offsetSegments = Self.offsetSegments(segments, by: appendOffset)
         let mergedSegments = priorSegments + offsetSegments
         try? archive.saveTranscript(mergedSegments, for: id)

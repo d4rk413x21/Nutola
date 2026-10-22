@@ -308,6 +308,38 @@ final class SpeakerLabelerTests: XCTestCase {
         XCTAssertTrue(meTexts.contains { $0.contains("sounds good") }, "genuine mic line kept")
     }
 
+    func testAcousticEvidenceDropsPlaybackButKeepsDifferentLocalSpeech() {
+        let system = TranscriptionOutput(words: [], segments: [
+            word("aggiorniamo il database domani", 1, 3)
+        ])
+        let mic = TranscriptionOutput(words: [], segments: [
+            word("aggiorniamo il database domani", 1, 3),
+            word("io preparo il backup", 4, 5)
+        ])
+        let wave: [Float] = (0..<400).map { i in
+            { let x = Double(i); let a = abs(sin(x * 0.17)); let b = abs(cos(x * 0.07)); return Float(0.02 + 0.03 * a + 0.02 * b) }()
+        }
+        let evidence = AcousticEchoEvidence(microphone: wave, system: wave)
+        let (segments, _) = SpeakerLabeler.label(
+            mic: mic, system: system, systemTurns: nil,
+            myName: "Me", echoEvidence: evidence)
+        XCTAssertFalse(segments.contains { $0.speakerID == "me" && $0.text.contains("aggiorniamo") })
+        XCTAssertTrue(segments.contains { $0.speakerID == "me" && $0.text == "io preparo il backup" })
+    }
+
+    func testEchoWithoutAcousticAgreementKeepsMic() {
+        let transcript = "dobbiamo verificare il deploy"
+        let mic = TranscriptionOutput(words: [], segments: [word(transcript, 1, 3)])
+        let system = TranscriptionOutput(words: [], segments: [word(transcript, 1, 3)])
+        let evidence = AcousticEchoEvidence(
+            microphone: Array(repeating: 0, count: 250),
+            system: Array(repeating: 0, count: 250))
+        let (segments, _) = SpeakerLabeler.label(
+            mic: mic, system: system, systemTurns: nil,
+            myName: "Me", echoEvidence: evidence)
+        XCTAssertTrue(segments.contains { $0.speakerID == "me" })
+    }
+
     func testDropsShortVerbatimRemoteEcho() {
         let mic = TranscriptionOutput(words: [], segments: [
             word("va bene", 3.0, 3.8)

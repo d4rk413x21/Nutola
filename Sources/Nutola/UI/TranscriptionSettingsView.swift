@@ -46,8 +46,8 @@ struct TranscriptionSettings: View {
                 }
                 if currentModel.isAvailable && currentModel.isDownloadable {
                     Text(currentModel.supportsLiveTranscription
-                         ? "Mode: live during meetings"
-                         : "Mode: batch after recording")
+                         ? "Mode: live preview and final transcription"
+                         : "Mode: final transcription only; live preview uses Apple Speech")
                         .font(.nutola(11))
                         .foregroundStyle(.secondary)
                 }

@@ -105,7 +105,9 @@ enum ProcessingPipeline {
             }
         }
 
-        // 1. Transcribe.
+        // 1. Transcribe. Honor the locale chosen for this meeting, even
+        // if it differs from the system language used by the batch pipeline.
+        let meetingLocale = TranscriptionLocales.storedLocale(forMeetingID: id, root: archive.root)
         onProgress("Preparing speech model…")
         try? await Transcriber.ensureModel(progress: { fraction in
             onProgress("Downloading speech model… \(Int(fraction * 100))%")
@@ -115,7 +117,7 @@ enum ProcessingPipeline {
         var systemOut: TranscriptionOutput?
         if hasMic {
             onProgress("Transcribing your microphone…")
-            do { micOut = try await Transcriber.transcribeFile(at: micURL) }
+            do { micOut = try await Transcriber.transcribeFile(at: micURL, selected: AppSettings.transcriptionModel, locale: meetingLocale) }
             catch {
                 notices.append(MeetingNotice.micTranscriptionFailed)
                 NutolaConsoleLog.pipeline("mic transcription failed — \(error.localizedDescription)")
@@ -123,7 +125,7 @@ enum ProcessingPipeline {
         }
         if hasSystem {
             onProgress("Transcribing the call audio…")
-            do { systemOut = try await Transcriber.transcribeFile(at: systemURL) }
+            do { systemOut = try await Transcriber.transcribeFile(at: systemURL, selected: AppSettings.transcriptionModel, locale: meetingLocale) }
             catch {
                 notices.append(MeetingNotice.callTranscriptionFailed)
                 NutolaConsoleLog.pipeline("system transcription failed — \(error.localizedDescription)")

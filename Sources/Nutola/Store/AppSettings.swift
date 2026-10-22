@@ -27,7 +27,7 @@ enum SettingsKey {
     static let showLiveRecordingCard = "showLiveRecordingCard" // floating live transcript widget
     static let openMainWindowAtLaunch = "openMainWindowAtLaunch" // show main window on launch (vs. menu bar only)
     static let sideNotesPanelWidth = "sideNotesPanelWidth"
-    static let transcriptionModel = "transcriptionModel" // apple | parakeetStreaming | parakeetBatch | nemotron
+    static let transcriptionModel = "transcriptionModel" // apple | parakeetRedux | parakeetUltra
     static let developerMode = "developerMode"                 // show Debug settings tab
     static let crashDiagnostics = "crashDiagnostics"           // write a scrubbed diagnostic on crash (opt-in)
     static let recipes = "recipes"                     // saved Ask Claude prompt library (RecipeStore)
@@ -123,6 +123,12 @@ enum AppSettings {
     static var defaults: UserDefaults { .standard }
 
     static func registerDefaults() {
+        // Migrate choices whose downloads never had a working inference engine.
+        // Keep files on disk until the user explicitly opts to remove them.
+        if let old = defaults.string(forKey: SettingsKey.transcriptionModel),
+            ["parakeetStreaming", "parakeetBatch", "nemotron"].contains(old) {
+            defaults.set(TranscriptionModel.apple.rawValue, forKey: SettingsKey.transcriptionModel)
+        }
         defaults.register(defaults: [
             SettingsKey.autoRecord: false,
             SettingsKey.detectMeetings: true,

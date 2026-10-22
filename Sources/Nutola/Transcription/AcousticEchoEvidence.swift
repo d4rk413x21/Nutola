@@ -44,7 +44,21 @@ struct AcousticEchoEvidence: Sendable {
         var sumSquares = 0.0
         var samples = 0
         while true {
-            try file.read(into: buffer, frameCount: buffer.frameCapacity)
+            do {
+                try file.read(into: buffer, frameCount: buffer.frameCapacity)
+            } catch {
+                // CoreAudio may report a decoder failure near the end of a long
+                // AAC recording even though the preceding audio was readable.
+                // Keep the envelope already decoded; bestCorrelation bounds
+                // every query to its actual length, so unread sections never
+                // count as evidence that the mic contains a remote echo.
+                guard !envelope.isEmpty else { throw error }
+                NutolaConsoleLog.pipeline(
+                    "acoustic echo: partial PCM decode for \(url.lastPathComponent) "
+                        + "at \(String(format: "%.1f", Double(samplesPerBin * envelope.count) / format.sampleRate))s"
+                        + " — \(error.localizedDescription)")
+                break
+            }
             let frames = Int(buffer.frameLength)
             guard frames > 0 else { break }
             guard let data = buffer.floatChannelData else { return [] }

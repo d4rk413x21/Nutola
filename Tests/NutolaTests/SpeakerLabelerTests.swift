@@ -308,6 +308,44 @@ final class SpeakerLabelerTests: XCTestCase {
         XCTAssertTrue(meTexts.contains { $0.contains("sounds good") }, "genuine mic line kept")
     }
 
+    func testDropsShortVerbatimRemoteEcho() {
+        let mic = TranscriptionOutput(words: [], segments: [
+            word("va bene", 3.0, 3.8)
+        ])
+        let system = TranscriptionOutput(words: [], segments: [
+            word("va bene", 3.1, 3.9)
+        ])
+        let (segments, _) = SpeakerLabeler.label(
+            mic: mic, system: system, systemTurns: nil, myName: "Me")
+        XCTAssertFalse(segments.contains { $0.speakerID == "me" })
+        XCTAssertTrue(segments.contains { $0.speakerID == "s1" })
+    }
+
+    func testDropsEchoWhenDiarizerSplitsRemoteUtterance() {
+        let mic = TranscriptionOutput(words: [], segments: [
+            word("dobbiamo aggiornare il database domani", 5.0, 7.0)
+        ])
+        let system = TranscriptionOutput(words: [], segments: [
+            word("dobbiamo aggiornare", 5.0, 5.9),
+            word("il database domani", 5.9, 7.0)
+        ])
+        let (segments, _) = SpeakerLabeler.label(
+            mic: mic, system: system, systemTurns: nil, myName: "Me")
+        XCTAssertFalse(segments.contains { $0.speakerID == "me" })
+    }
+
+    func testKeepsGenuineSimultaneousDifferentSentence() {
+        let mic = TranscriptionOutput(words: [], segments: [
+            word("posso controllare io", 3.0, 4.0)
+        ])
+        let system = TranscriptionOutput(words: [], segments: [
+            word("aggiorniamo la documentazione", 3.0, 4.0)
+        ])
+        let (segments, _) = SpeakerLabeler.label(
+            mic: mic, system: system, systemTurns: nil, myName: "Me")
+        XCTAssertTrue(segments.contains { $0.speakerID == "me" })
+    }
+
     func testKeepsShortMicBackchannel() {
         // A brief affirmation that happens to echo shouldn't be nuked.
         let system = TranscriptionOutput(words: [word("yeah", 3.0, 3.4)], segments: [])

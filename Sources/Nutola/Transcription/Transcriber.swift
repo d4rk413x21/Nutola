@@ -110,20 +110,21 @@ enum Transcriber {
     /// Back-compat entry point used by `ProcessingPipeline` and existing tests.
     /// Branches on the user's selected transcription model (AppSettings).
     static func transcribeFile(at url: URL) async throws -> TranscriptionOutput {
-        try await transcribeFile(at: url, selected: AppSettings.transcriptionModel)
+        try await transcribeFile(at: url, selected: AppSettings.transcriptionModel, locale: nil)
     }
 
     /// Transcribes a file using the selected engine, falling back to Apple's
     /// SpeechAnalyzer when the selected engine's inference isn't wired.
     static func transcribeFile(
         at url: URL,
-        selected: TranscriptionModel?
+        selected: TranscriptionModel?,
+        locale: Locale? = nil
     ) async throws -> TranscriptionOutput {
         let model = selected ?? AppSettings.transcriptionModel
         let decision = resolveEngine(for: model)
         switch decision {
         case .apple:
-            return try await transcribeWithApple(at: url)
+            return try await transcribeWithApple(at: url, locale: locale)
         case .parakeetInstalledButNoInference(let selected):
             // The weights are on disk, but Nutola has no Parakeet inference engine
             // wired yet (SoniqoModelStore manages bytes only). Fall back to Apple
@@ -133,7 +134,7 @@ enum Transcriber {
                 + " (\(selected.rawValue))")
             NutolaConsoleLog.transcribe(
                 "file \(url.lastPathComponent) via Apple (fallback from \(selected.rawValue))")
-            return try await transcribeWithApple(at: url)
+            return try await transcribeWithApple(at: url, locale: locale)
         case .parakeetNotInstalled(let selected):
             // No weights on disk and no inference engine wired — the user hasn't
             // downloaded the model (or the download failed). Fall back to Apple.
@@ -141,20 +142,20 @@ enum Transcriber {
                 "Parakeet model selected (\(selected.rawValue)) but not installed — falling back to Apple Speech")
             NutolaConsoleLog.transcribe(
                 "file \(url.lastPathComponent) via Apple (fallback from \(selected.rawValue), not installed)")
-            return try await transcribeWithApple(at: url)
+            return try await transcribeWithApple(at: url, locale: locale)
         case .nemotronNotAvailable:
             NutolaConsoleLog.nemotron(
                 "Nemotron engine not yet available — falling back to Apple Speech")
             NutolaConsoleLog.transcribe(
                 "file \(url.lastPathComponent) via Apple (fallback from nemotron)")
-            return try await transcribeWithApple(at: url)
+            return try await transcribeWithApple(at: url, locale: locale)
         }
     }
 
     /// The Apple SpeechAnalyzer batch path — the wired inference engine today.
-    private static func transcribeWithApple(at url: URL) async throws -> TranscriptionOutput {
+    private static func transcribeWithApple(at url: URL, locale: Locale?) async throws -> TranscriptionOutput {
         NutolaConsoleLog.transcribe("file \(url.lastPathComponent)")
-        let transcriber = try await makeTranscriber()
+        let transcriber = try await makeTranscriber(locale: locale)
         guard let analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(
             compatibleWith: [transcriber])
         else {
@@ -246,11 +247,17 @@ enum Transcriber {
         }
     }
 
-    private static func makeTranscriber() async throws -> SpeechTranscriber {
+    private static func makeTranscriber(locale: Locale?) async throws -> SpeechTranscriber {
         guard SpeechTranscriber.isAvailable else { throw TranscriberError.modelUnavailable }
-        guard let resolved = await TranscriptionLocales.primary() else {
+        let pinned = if let locale {
+            await SpeechTranscriber.supportedLocale(equivalentTo: locale)
+        } else {
+            nil as Locale?
+        }
+        guard let resolved = pinned ?? (await TranscriptionLocales.primary()) else {
             throw TranscriberError.unsupportedLocale(Locale.current.identifier)
         }
+        NutolaConsoleLog.locales("batch locale → \(resolved.identifier(.bcp47))")
         // Batch mode: no .volatileResults, so every result arrives final exactly once.
         return SpeechTranscriber(
             locale: resolved,

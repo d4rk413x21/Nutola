@@ -1,3 +1,4 @@
+import AVFoundation
 import XCTest
 @testable import Nutola
 
@@ -30,6 +31,29 @@ final class AcousticEchoEvidenceTests: XCTestCase {
             system: Array(repeating: 0, count: 150))
         XCTAssertNil(evidence.bestCorrelation(start: 0, end: 2))
         XCTAssertFalse(evidence.stronglyMatches(start: 0, end: 2))
+    }
+
+    func testEnvelopeDecoderReadsRecordedPCMAndBoundsToAvailableAudio() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("nutola-echo-test-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        let frameCount = 96_000
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frameCount))!
+        buffer.frameLength = AVAudioFrameCount(frameCount)
+        let channel = buffer.floatChannelData![0]
+        for index in 0..<frameCount {
+            let bin = index / 960
+            let amplitude = Float(0.01 + 0.08 * abs(sin(Double(bin) * 0.38)))
+            channel[index] = amplitude * Float(sin(Double(index) * 0.07))
+        }
+        try file.write(from: buffer)
+        // Drop the writer before reopening the same WAV as a reader.
+        let evidence = try AcousticEchoEvidence.load(microphoneURL: url, systemURL: url)
+        XCTAssertGreaterThan(evidence.microphone.count, 90)
+        XCTAssertTrue(evidence.stronglyMatches(start: 0.3, end: 1.7))
+        XCTAssertNil(evidence.bestCorrelation(start: 10, end: 12))
     }
 
     func testTooShortIntervalIsNotEvidence() {

@@ -8,6 +8,7 @@ import Speech
 /// models are installed — using `Locale.current` alone (typically en-US) locks
 /// Portuguese speech into English phonetics.
 enum TranscriptionLocales {
+  static let italian = Locale(identifier: "it-IT")
   static let english = Locale(identifier: "en-US")
   static let brazilianPortuguese = Locale(identifier: "pt-BR")
 
@@ -34,21 +35,21 @@ enum TranscriptionLocales {
     Locale(identifier: "tr-TR"),
     Locale(identifier: "ar-SA"),
   ]
-  /// BCP-47 identifiers to try, in priority order, when picking a primary locale.
+  /// Italian-first default for this fork, independent of the macOS UI locale.
+  /// Explicit per-meeting selections take precedence in both live and batch modes.
   static func primaryCandidateIdentifiers() -> [String] {
-    var ids: [String] = []
-    if Locale.preferredLanguages.contains(where: { $0.hasPrefix("pt") }) {
-      ids.append(brazilianPortuguese.identifier(.bcp47))
-    }
-    ids.append(Locale.current.identifier(.bcp47))
-    ids.append(english.identifier(.bcp47))
-    ids.append(brazilianPortuguese.identifier(.bcp47))
-    return dedupe(ids)
+    dedupe([
+      italian.identifier(.bcp47),
+      Locale.current.identifier(.bcp47),
+      english.identifier(.bcp47),
+      brazilianPortuguese.identifier(.bcp47),
+    ])
   }
 
   /// Every supported locale whose assets should be reserved for code-switching.
   static func assetCandidateIdentifiers() -> [String] {
     dedupe([
+      italian.identifier(.bcp47),
       Locale.current.identifier(.bcp47),
       english.identifier(.bcp47),
       brazilianPortuguese.identifier(.bcp47),
@@ -140,6 +141,19 @@ enum TranscriptionLocales {
       try await request.downloadAndInstall()
     }
     progress?(1)
+  }
+
+  /// Read the per-meeting UI language pin from the same archive used by
+  /// TranscriptionLocaleStore. Post-recording processing may execute outside
+  /// the main actor, so it reads the persisted value rather than the UI store.
+  static func storedLocale(forMeetingID meetingID: UUID, root: URL) -> Locale? {
+    let file = root.appendingPathComponent("TranscriptionLocales/overrides.json")
+    guard let data = try? Data(contentsOf: file),
+          let overrides = try? JSONDecoder().decode([String: String].self, from: data),
+          let identifier = overrides[meetingID.uuidString],
+          !identifier.isEmpty
+    else { return nil }
+    return Locale(identifier: identifier)
   }
 
   private static func dedupe(_ ids: [String]) -> [String] {

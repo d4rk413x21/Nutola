@@ -25,11 +25,4 @@ jobs:
       - run: swift test
       # Model-dependent paths (FoundationModels, SpeechAnalyzer assets) are
       # unavailable on hosted runners; tests cover only pure logic by design.
-      - name: Assemble app bundle
-        run: make app
-      - name: Zip
-        run: ditto -c -k --keepParent dist/Nutola.app dist/Nutola.zip
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Nutola
-          path: dist/Nutola.zip
+      # Distributable .app bundles are built only when publishing a GitHub release.

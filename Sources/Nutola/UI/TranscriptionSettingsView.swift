@@ -13,6 +13,8 @@ struct TranscriptionSettings: View {
     @State private var downloading = false
     @State private var progress: Double = 0
     @State private var error: String?
+    @State private var legacyBytes: Int64 = 0
+    @State private var legacyRemovalError: String?
     @State private var pendingRemove = false
     @State private var freedBytes: Int64 = 0
     @State private var downloadTask: Task<Void, Never>?
@@ -48,6 +50,26 @@ struct TranscriptionSettings: View {
                          : "Mode: batch after recording")
                         .font(.nutola(11))
                         .foregroundStyle(.secondary)
+                }
+            }
+
+            if legacyBytes > 0 {
+                Section("Unused legacy downloads") {
+                    Text("The old Soniqo Parakeet and NVIDIA .nemo downloads are not used by the new FluidAudio engines.")
+                        .font(.nutola(11))
+                        .foregroundStyle(.secondary)
+                    Button("Delete unused legacy models (\(TranscriptionModel.formatBytes(legacyBytes)))", role: .destructive) {
+                        do {
+                            _ = try FluidParakeetModels.deleteLegacyDownloads()
+                            legacyBytes = FluidParakeetModels.legacyBytes()
+                            legacyRemovalError = nil
+                        } catch {
+                            legacyRemovalError = error.localizedDescription
+                        }
+                    }
+                    if let legacyRemovalError {
+                        Text(legacyRemovalError).foregroundStyle(.red)
+                    }
                 }
             }
 
@@ -166,6 +188,7 @@ struct TranscriptionSettings: View {
     // MARK: - Actions
 
     private func refresh() async {
+        legacyBytes = FluidParakeetModels.legacyBytes()
         installed = model.isModelInstalled
         installedBytes = model.modelInstalledBytes
         if installed {

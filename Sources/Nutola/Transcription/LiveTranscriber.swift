@@ -20,7 +20,10 @@ final class LiveTranscriber: @unchecked Sendable {
   /// How far apart, in seconds, a mic echo and its clean system copy may land.
   /// The two channels finalize the same utterance independently, so their
   /// point-in-time stamps drift; wider than the batch tolerance to absorb that.
-  static let liveEchoWindow: TimeInterval = 4
+  static let liveEchoWindow: TimeInterval = 6
+  /// Allow the remote speech recognizer to finalize before attributing a mic line.
+  /// The raw microphone is still recorded without delay.
+  static let microphoneAttributionDelay: TimeInterval = 5
 
   /// Synthetic speakers used to format the live transcript.
   static let speakers = [
@@ -84,6 +87,10 @@ final class LiveTranscriber: @unchecked Sendable {
   private let timeOffset: TimeInterval
   private let lock = NSLock()
   private var finalized: [TranscriptSegment] = []
+  // Mic speech is provisional while the other channel's final text catches up.
+  // Only validated local utterances become public live transcript segments.
+  private var pendingMic: [UInt64: TranscriptSegment] = [:]
+  private var nextPendingID: UInt64 = 0
   private var volatile: [String: String] = [:]  // speakerID -> in-progress text
   private var channels: [Channel] = []
   private var started = false
@@ -179,8 +186,11 @@ final class LiveTranscriber: @unchecked Sendable {
   }
 
   /// Labels each channel's in-progress fragment for the live UI.
-  static func formattedVolatile(_ volatile: [String: String]) -> String {
+  static func formattedVolatile(
+    _ volatile: [String: String], suppressUnverifiedMic: Bool = false
+  ) -> String {
     speakers.compactMap { sp -> String? in
+      if suppressUnverifiedMic && sp.id == youSpeakerID { return nil }
       guard let text = volatile[sp.id], !text.isEmpty else { return nil }
       return "\(name(for: sp.id)): \(text)"
     }.joined(separator: "\n")
@@ -199,16 +209,32 @@ final class LiveTranscriber: @unchecked Sendable {
 
   /// Ends input and finalizes; the per-channel tasks then complete. Sets `stopped`
   /// so a still-in-flight start() tears down rather than publishes its channels.
-  func stop() async {
+  @discardableResult
+  func stop() async -> [TranscriptSegment] {
     let chans = lock.withLock {
       stopped = true
       let c = channels
       channels = []
       return c
     }
-    let count = lock.withLock { finalized.count }
-    NutolaConsoleLog.live("stopping — \(count) finalized segments")
+    NutolaConsoleLog.live("stopping — \(lock.withLock { finalized.count }) finalized segments")
     await Self.teardown(chans)
+    // The remote analyzer may finalize its last sentence during teardown.
+    // Resolve all staged microphone lines against the complete remote transcript
+    // before the recording session persists live.json and starts batch processing.
+    lock.lock()
+    for segment in pendingMic.values.sorted(by: { $0.start < $1.start }) {
+      if !Self.isPlaybackEcho(segment, among: finalized) {
+        Self.insertChronologically(segment, into: &finalized)
+      }
+    }
+    pendingMic.removeAll()
+    let segments = finalized
+    let vol = Self.formattedVolatile(volatile)
+    let callback = onUpdate
+    lock.unlock()
+    callback?(segments, vol)
+    return segments
   }
 
   /// Finishes each channel's input and awaits its tasks to completion.
@@ -289,93 +315,130 @@ final class LiveTranscriber: @unchecked Sendable {
     let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
     let elapsed = max(0, Date().timeIntervalSince(startDate)) + timeOffset
 
-    // Resolve the platform (Zoom) speaker OUTSIDE the lock — the AX scan can
-    // take 100ms+, and holding the lock blocks the audio buffer feeds. Only
-    // system-audio segments need platform attribution; mic segments stay "me"
-    // and are only dropped as bleed echoes when their text matches a concurrent
-    // "them" segment (handled below, inside the lock).
-    let platformSpeaker: String? =
-      (speakerID == Self.othersSpeakerID)
-      ? platformSpeakerResolver?(elapsed)
-      : nil
+    // Don't acquire the CoreAudio tap lock while holding the transcript lock.
+    // This peak is a hint for the UI only; it never deletes local speech.
+    let remotePlaybackActive = (systemPeakProvider?() ?? 0) >= Self.remoteSpeechPeakThreshold
+    let platformSpeaker: String? = (speakerID == Self.othersSpeakerID)
+      ? platformSpeakerResolver?(elapsed) : nil
 
     lock.lock()
-    let bleedMode = headphoneBleedMode
     let effectiveSpeaker = speakerID
     let segSpeakerID = platformSpeaker ?? effectiveSpeaker
     if result.isFinal {
       volatile[effectiveSpeaker] = nil
-      if bleedMode, speakerID == Self.youSpeakerID {
-        // Headphone bleed: built-in mic hears BT output, so a remote line
-        // can land on the mic channel. Drop the mic segment ONLY when its
-        // text overlaps a concurrent "them" segment — that's actual bleed.
-        // Without the text check, we'd wipe out every local utterance that
-        // lands while the remote side is talking (interruptions, agreements).
-        let nearby = finalized.filter {
-          $0.speakerID == Self.othersSpeakerID
-            && abs($0.start - elapsed) <= Self.liveEchoWindow
-        }
-        let othersLiveText = volatile[Self.othersSpeakerID] ?? ""
-        let micWords = TranscriptText.wordTokens(text)
-        let isBleed: Bool = {
-          guard micWords.count >= 4 else { return false }
-          for other in nearby {
-            if TranscriptText.covers(text, by: other.text, atLeast: 0.5) { return true }
-          }
-          if !othersLiveText.isEmpty,
-            TranscriptText.covers(text, by: othersLiveText, atLeast: 0.5)
-          {
-            return true
-          }
-          return false
-        }()
-        if isBleed {
-          NutolaConsoleLog.live(
-            "dropped mic bleed @ \(String(format: "%.1f", elapsed))s (text matches others): \(text.prefix(50))"
-          )
-          let segments = finalized
-          let vol = Self.formattedVolatile(volatile)
-          let callback = onUpdate
-          lock.unlock()
-          callback?(segments, vol)
-          return
-        }
-      }
       if !text.isEmpty {
-        let seg = TranscriptSegment(
+        let segment = TranscriptSegment(
           speakerID: segSpeakerID, start: elapsed, end: elapsed, text: text)
-        var idx = finalized.count
-        while idx > 0, finalized[idx - 1].start > seg.start { idx -= 1 }
-        finalized.insert(seg, at: idx)
-        if bleedMode, effectiveSpeaker == Self.othersSpeakerID {
-          Self.removeEchoedMicSegments(
-            around: seg.start, in: &finalized, window: Self.liveEchoWindow, minCoverage: 0.35)
-          Self.removeHeadphoneBleedMic(
-            around: seg.start, othersText: text, in: &finalized, window: 3.0)
+        if speakerID == Self.youSpeakerID && systemPeakProvider != nil {
+          if Self.isPlaybackEcho(segment, among: finalized) {
+            NutolaConsoleLog.live("suppressed mic echo @ \(String(format: "%.1f", elapsed))s: \(text.prefix(60))")
+          } else {
+            // The system ASR result often arrives AFTER the mic ASR result.
+            // Wait briefly rather than showing a false "You" line and retracting
+            // it once the system channel finally publishes the same sentence.
+            let id = nextPendingID
+            nextPendingID += 1
+            pendingMic[id] = segment
+            Task.detached { [weak self] in
+              try? await Task.sleep(for: .seconds(Self.microphoneAttributionDelay))
+              self?.publishPendingMic(id: id)
+            }
+          }
         } else {
+          Self.insertChronologically(segment, into: &finalized)
+          if speakerID != Self.youSpeakerID {
+            let matched = pendingMic.filter {
+              Self.isPlaybackEcho($0.value, among: finalized)
+            }
+            for (id, pending) in matched {
+              pendingMic.removeValue(forKey: id)
+              NutolaConsoleLog.live(
+                "suppressed pending mic echo @ \(String(format: "%.1f", pending.start))s")
+            }
+          }
+          // Still handle an echo if the two ASR streams finalize more than
+          // the wait apart, and recognize named remote speakers too.
           Self.removeEchoedMicSegments(
-            around: seg.start, in: &finalized, window: Self.liveEchoWindow)
-        }
-        if let platformSpeaker, platformSpeaker != effectiveSpeaker {
-          NutolaConsoleLog.live(
-            "platform→\(platformSpeaker) @ \(String(format: "%.1f", elapsed))s: \(text.prefix(80))")
-        } else {
-          NutolaConsoleLog.live(
-            "final \(segSpeakerID) @ \(String(format: "%.1f", elapsed))s (\(finalized.count) segments): \(text.prefix(80))"
-          )
+            around: segment.start, in: &finalized,
+            window: Self.liveEchoWindow)
+          if speakerID == Self.youSpeakerID && !finalized.contains(where: { $0.id == segment.id }) {
+            NutolaConsoleLog.live("suppressed mic echo @ \(String(format: "%.1f", elapsed))s")
+          } else if let platformSpeaker, platformSpeaker != effectiveSpeaker {
+            NutolaConsoleLog.live(
+              "platform→\(platformSpeaker) @ \(String(format: "%.1f", elapsed))s: \(text.prefix(80))")
+          } else {
+            NutolaConsoleLog.live(
+              "final \(segSpeakerID) @ \(String(format: "%.1f", elapsed))s (\(finalized.count) segments): \(text.prefix(80))")
+          }
         }
       }
     } else {
+      // Even partial recognition on the mic can be far-end loudspeaker bleed.
+      // Avoid assigning it to "You" while output is active. The final mic text
+      // is kept for verification, not discarded.
       volatile[effectiveSpeaker] = text.isEmpty ? nil : text
-      if speakerID == Self.youSpeakerID, effectiveSpeaker != speakerID {
-        volatile[Self.youSpeakerID] = nil
-      }
+    }
+    let segments = finalized
+    let vol = Self.formattedVolatile(
+      volatile, suppressUnverifiedMic: remotePlaybackActive)
+    let callback = onUpdate
+    lock.unlock()
+    callback?(segments, vol)
+  }
+
+  private func publishPendingMic(id: UInt64) {
+    lock.lock()
+    // Stop resolves the pending queue itself after the system stream closes.
+    guard !stopped, let segment = pendingMic.removeValue(forKey: id) else {
+      lock.unlock()
+      return
+    }
+    if !Self.isPlaybackEcho(segment, among: finalized) {
+      Self.insertChronologically(segment, into: &finalized)
+      NutolaConsoleLog.live(
+        "confirmed local speech @ \(String(format: "%.1f", segment.start))s (\(finalized.count) segments): \(segment.text.prefix(80))")
+    } else {
+      NutolaConsoleLog.live(
+        "suppressed delayed mic echo @ \(String(format: "%.1f", segment.start))s")
     }
     let segments = finalized
     let vol = Self.formattedVolatile(volatile)
     let callback = onUpdate
     lock.unlock()
     callback?(segments, vol)
+  }
+
+  /// Match a mic hypothesis against the *independent system-audio transcript*.
+  /// Only near-verbatim text in a small time window can be removed. Shared
+  /// topic words (or just both people speaking at once) are not enough.
+  static func isPlaybackEcho(
+    _ mic: TranscriptSegment, among segments: [TranscriptSegment]
+  ) -> Bool {
+    guard mic.speakerID == youSpeakerID else { return false }
+    let words = TranscriptText.wordTokens(mic.text)
+    guard words.count >= 2 else { return false }
+    let nearby = segments.filter {
+      $0.speakerID != youSpeakerID
+        && abs($0.start - mic.start) <= liveEchoWindow
+    }.sorted { $0.start < $1.start }
+    guard !nearby.isEmpty else { return false }
+    if words.count <= 4 {
+      return nearby.contains {
+        TranscriptText.wordTokens($0.text) == words
+      }
+    }
+    return nearby.contains {
+      TranscriptText.covers(mic.text, by: $0.text, atLeast: 0.82)
+    } || TranscriptText.covers(
+      mic.text, by: nearby.map(\\.text).joined(separator: " "), atLeast: 0.82)
+  }
+
+  private static func insertChronologically(
+    _ segment: TranscriptSegment, into segments: inout [TranscriptSegment]
+  ) {
+    var index = segments.count
+    while index > 0 && segments[index - 1].start > segment.start { index -= 1 }
+    segments.insert(segment, at: index)
   }
 
   // MARK: - Echo dedup
@@ -405,7 +468,9 @@ final class LiveTranscriber: @unchecked Sendable {
     // the tail. Walk back only until we fall out of it.
     var start = segments.count
     while start > 0, segments[start - 1].start >= lo { start -= 1 }
-    let others = segments[start...].filter { $0.speakerID == othersSpeakerID && $0.start <= hi }
+    let others = segments[start...].filter {
+      $0.speakerID != youSpeakerID && $0.start <= hi
+    }
     guard !others.isEmpty else { return }
     var i = segments.count - 1
     while i >= start {

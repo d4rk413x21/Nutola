@@ -4,8 +4,7 @@ import XCTest
 final class AcousticEchoEvidenceTests: XCTestCase {
     func testMatchedDelayedPlaybackHasHighCorrelation() {
         let system: [Float] = (0..<220).map { i in
-            Float(0.02 + 0.025 * abs(sin(Double(i) * 0.31))
-                + 0.01 * abs(cos(Double(i) * 0.13)))
+            { let x = Double(i); let a = abs(sin(x * 0.31)); let b = abs(cos(x * 0.13)); return Float(0.02 + 0.025 * a + 0.01 * b) }()
         }
         let mic: [Float] = (0..<220).map { i in
             i >= 8 ? system[i - 8] * 0.6 : 0.005

@@ -200,7 +200,7 @@ final class MockRecordingService: RecordingService {
         return continueResult
     }
 
-    func stop() -> (session: RecordingSession, meeting: Meeting)? {
+    func stop() async -> (session: RecordingSession, meeting: Meeting)? {
         stopCallCount += 1
         guard let stopPair else { return nil }
         clear()
@@ -215,7 +215,8 @@ final class MockRecordingService: RecordingService {
     }
 
     func prepareForTermination(meetingRepository: MeetingRepository) {
-        _ = stop()
+        // Test-only termination: do not launch an unstructured async stop.
+        clear()
     }
 
     func adopt(_ handle: RecordingSessionHandle) {

@@ -430,7 +430,7 @@ final class LiveTranscriber: @unchecked Sendable {
     return nearby.contains {
       TranscriptText.covers(mic.text, by: $0.text, atLeast: 0.82)
     } || TranscriptText.covers(
-      mic.text, by: nearby.map(\\.text).joined(separator: " "), atLeast: 0.82)
+      mic.text, by: nearby.map(\.text).joined(separator: " "), atLeast: 0.82)
   }
 
   private static func insertChronologically(

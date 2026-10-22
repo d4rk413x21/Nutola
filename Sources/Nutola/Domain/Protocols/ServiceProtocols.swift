@@ -31,7 +31,9 @@ protocol RecordingService: AnyObject {
         meetingRepository: MeetingRepository
     ) async -> Result<RecordingSessionHandle, RecordingError>
 
-    func stop() -> (session: RecordingSession, meeting: Meeting)?
+    /// Returns only after capture files and the live transcript have been finalized.
+    /// Processing must never start while .m4a files are still being written.
+    func stop() async -> (session: RecordingSession, meeting: Meeting)?
     func discard() -> (session: RecordingSession, meeting: Meeting)?
     func prepareForTermination(meetingRepository: MeetingRepository)
 }

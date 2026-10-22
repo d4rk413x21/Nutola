@@ -249,12 +249,19 @@ enum Transcriber {
 
     private static func makeTranscriber(locale: Locale?) async throws -> SpeechTranscriber {
         guard SpeechTranscriber.isAvailable else { throw TranscriberError.modelUnavailable }
-        let pinned = if let locale {
-            await SpeechTranscriber.supportedLocale(equivalentTo: locale)
+        let pinned: Locale?
+        if let locale {
+            pinned = await SpeechTranscriber.supportedLocale(equivalentTo: locale)
         } else {
-            nil as Locale?
+            pinned = nil
         }
-        guard let resolved = pinned ?? (await TranscriptionLocales.primary()) else {
+        let resolved: Locale?
+        if let pinned {
+            resolved = pinned
+        } else {
+            resolved = await TranscriptionLocales.primary()
+        }
+        guard let resolved else {
             throw TranscriberError.unsupportedLocale(Locale.current.identifier)
         }
         NutolaConsoleLog.locales("batch locale → \(resolved.identifier(.bcp47))")

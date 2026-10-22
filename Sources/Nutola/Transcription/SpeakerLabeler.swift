@@ -9,7 +9,8 @@ enum SpeakerLabeler {
         system: TranscriptionOutput?,
         systemTurns: [DiarizedTurn]?,
         myName: String,
-        namedSpeakers: Bool = false
+        namedSpeakers: Bool = false,
+        echoEvidence: AcousticEchoEvidence? = nil
     ) -> (segments: [TranscriptSegment], speakers: [Speaker]) {
         var segments: [TranscriptSegment] = []
         var speakers: [Speaker] = []
@@ -38,7 +39,7 @@ enum SpeakerLabeler {
 
         // On speakers (no headphones) the far end bleeds into the mic and gets
         // transcribed a second time under "me"; drop those echoed duplicates.
-        let deduped = dropEchoedMic(merged)
+        let deduped = dropEchoedMic(merged, evidence: echoEvidence)
         let present = Set(deduped.map(\.speakerID))
         let speakersOut = speakers.filter { present.contains($0.id) }
         let mode = namedSpeakers ? "hybrid/Zoom names"
@@ -167,20 +168,44 @@ enum SpeakerLabeler {
         return (remapped, speakers.filter { present.contains($0.id) })
     }
 
-    /// Drops a mic ("me") segment when a system segment overlaps it in time and
-    /// carries essentially the same words — the local speakers played the far end
-    /// back into the mic. The system tap is a clean digital copy of the far end, so
-    /// the system segment is the real one to keep. Short backchannels ("yeah",
-    /// "right") are left alone to avoid nuking genuine local speech.
-    private static func dropEchoedMic(_ segments: [TranscriptSegment]) -> [TranscriptSegment] {
+    /// Requires corroboration from BOTH the remote transcript and acoustic
+    /// cross-channel correlation before removing an apparent microphone echo.
+    /// When audio evidence is unavailable, retain the existing conservative
+    /// text-only behavior for backwards compatibility.
+    private static func dropEchoedMic(
+        _ segments: [TranscriptSegment], evidence: AcousticEchoEvidence?
+    ) -> [TranscriptSegment] {
         let others = segments.filter { $0.speakerID != "me" }
         guard !others.isEmpty else { return segments }
         return segments.filter { seg in
-            guard seg.speakerID == "me", TranscriptText.wordTokens(seg.text).count >= 4 else { return true }
-            let isEcho = others.contains { sys in
-                overlaps(seg, sys, tolerance: 2) && TranscriptText.covers(seg.text, by: sys.text, atLeast: 0.6)
+            guard seg.speakerID == "me" else { return true }
+            let tokens = TranscriptText.wordTokens(seg.text)
+            guard tokens.count >= 2 else { return true }
+            let nearby = others.filter { overlaps(seg, $0, tolerance: 0.75) }
+            guard !nearby.isEmpty else { return true }
+
+            let transcriptMatch: Bool
+            if tokens.count <= 3 {
+                transcriptMatch = nearby.contains { remote in
+                    TranscriptText.wordTokens(remote.text) == tokens
+                }
+            } else {
+                let joined = nearby.sorted { $0.start < $1.start }
+                    .map(\.text).joined(separator: " ")
+                transcriptMatch = nearby.contains {
+                    TranscriptText.covers(seg.text, by: $0.text, atLeast: 0.6)
+                } || TranscriptText.covers(seg.text, by: joined, atLeast: 0.6)
             }
-            return !isEcho
+            guard transcriptMatch else { return true }
+
+            if let evidence {
+                // Audio-level support is necessary; if absent or ambiguous,
+                // leave the utterance intact rather than losing real speech.
+                return !evidence.stronglyMatches(start: seg.start, end: seg.end)
+            }
+            // Preserve existing behavior for prior recordings without audio
+            // comparison, except additionally discard exact 2-3-word echoes.
+            return false
         }
     }
 

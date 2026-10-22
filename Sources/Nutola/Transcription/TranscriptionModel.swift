@@ -24,7 +24,7 @@ enum TranscriptionModel: String, CaseIterable, Identifiable, Hashable {
         case .parakeetRedux:
             "Multilingual (includes Italian). Compact Core ML model (~220 MB). Runs on the complete audio after recording. Live preview uses Apple Speech."
         case .parakeetUltra:
-            "Multilingual (includes Italian). Larger Core ML model (~630 MB), optimized for accuracy. Live uses overlapping windows; final audio is transcribed again."
+            "Multilingual (includes Italian). Larger Core ML model (~630 MB), optimized for accuracy. Runs on the complete audio after recording. Live preview uses Apple Speech."
         }
     }
 
@@ -45,8 +45,7 @@ enum TranscriptionModel: String, CaseIterable, Identifiable, Hashable {
 
     func downloadModel(progress: @Sendable @escaping (Double) -> Void) async throws {
         guard self != .apple else { return }
-        try await FluidParakeetModels.download(self)
-        progress(1)
+        try await FluidParakeetModels.download(self, progress: progress)
     }
 
     @discardableResult

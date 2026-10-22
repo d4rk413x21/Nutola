@@ -134,6 +134,31 @@ final class ProcessingPipelineTests: XCTestCase {
         XCTAssertEqual(ProcessingPipeline.offsetSegments(original, by: 0), original)
     }
 
+    func testFinalSpeakersExcludeUnusedLivePlaceholder() {
+        let speakers = [
+            Speaker(id: "me", name: "You", isMe: true),
+            Speaker(id: "them", name: "Others"),
+            Speaker(id: "s1", name: "Speaker 1"),
+            Speaker(id: "s2", name: "Speaker 2")
+        ]
+        let segments = [
+            seg("s1", "remote speech"),
+            seg("s2", "second remote speaker")
+        ]
+        let actual = ProcessingPipeline.speakersPresent(in: segments, from: speakers)
+        XCTAssertEqual(actual.map(\.id), ["s1", "s2"])
+    }
+
+    func testFinalSpeakersKeepRealLocalVoice() {
+        let speakers = [
+            Speaker(id: "me", name: "You", isMe: true),
+            Speaker(id: "s1", name: "Speaker 1")
+        ]
+        let actual = ProcessingPipeline.speakersPresent(
+            in: [seg("me", "hello"), seg("s1", "hello back")], from: speakers)
+        XCTAssertEqual(actual.map(\.id), ["me", "s1"])
+    }
+
     // MARK: - mergingSpeakers
 
     func testMergingSpeakersKeepsExistingAndAppendsNewById() {

@@ -511,8 +511,10 @@ final class RecordingSession: ObservableObject {
   // as `stop()`), then hop back to the main actor to set `stopNotice`.
   func stopAsync() async {
     teardownRecorders()
+    // Finalize the files off MainActor, then flush the live transcript before
+    // the post-recording pipeline reads either source.
     await finalizeStopNotice()
-    flushLiveTranscriber()
+    await flushLiveTranscriberAsync()
   }
 
   /// Synchronous teardown of timers, observers, trackers, and level meters.
@@ -557,6 +559,16 @@ final class RecordingSession: ObservableObject {
       archiveRef.saveLiveTranscript(liveSegments, for: meetingID)
       NutolaConsoleLog.recording("live transcript flushed (\(liveSegments.count) segments)")
     }
+  }
+
+  /// The awaited version prevents the final live.json write from racing
+  /// with processing (which reads and then removes that file).
+  private func flushLiveTranscriberAsync() async {
+    guard let live = liveTranscriber else { return }
+    liveTranscriber = nil
+    await live.stop()
+    archive.saveLiveTranscript(liveSegments, for: meetingID)
+    NutolaConsoleLog.recording("live transcript flushed (\(liveSegments.count) segments)")
   }
 
   /// Stop the mic/system recorders (off the main actor, when called via

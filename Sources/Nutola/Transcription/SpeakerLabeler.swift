@@ -167,20 +167,56 @@ enum SpeakerLabeler {
         return (remapped, speakers.filter { present.contains($0.id) })
     }
 
-    /// Drops a mic ("me") segment when a system segment overlaps it in time and
-    /// carries essentially the same words — the local speakers played the far end
-    /// back into the mic. The system tap is a clean digital copy of the far end, so
-    /// the system segment is the real one to keep. Short backchannels ("yeah",
-    /// "right") are left alone to avoid nuking genuine local speech.
+    /// Prefer the direct digital system recording when the mic contains a
+    /// recognizably duplicated far-end utterance. This is *not* speaker ID:
+    /// unmatched mic audio remains attributed to the local participant and
+    /// needs audio-level review if room speakers leaked into the microphone.
+    ///
+    /// Compare against both individual system segments and the combined
+    /// time-overlapping sequence: diarization may split one echoed utterance
+    /// into several remote speaker turns.
+    ///
+    /// For 2-3 word echoes, require an exact normalized match and near-aligned
+    /// midpoints. Single-word backchannels stay untouched, since two people
+    /// saying "sì" simultaneously is common and should not be discarded.
     private static func dropEchoedMic(_ segments: [TranscriptSegment]) -> [TranscriptSegment] {
-        let others = segments.filter { $0.speakerID != "me" }
-        guard !others.isEmpty else { return segments }
-        return segments.filter { seg in
-            guard seg.speakerID == "me", TranscriptText.wordTokens(seg.text).count >= 4 else { return true }
-            let isEcho = others.contains { sys in
-                overlaps(seg, sys, tolerance: 2) && TranscriptText.covers(seg.text, by: sys.text, atLeast: 0.6)
+        let remote = segments.filter { $0.speakerID != "me" }
+        guard !remote.isEmpty else { return segments }
+
+        return segments.filter { mic in
+            guard mic.speakerID == "me" else { return true }
+            let micWords = TranscriptText.wordTokens(mic.text)
+            guard micWords.count >= 2 else { return true }
+
+            let matches = remote.filter { sys in
+                overlaps(mic, sys, tolerance: 0.75)
             }
-            return !isEcho
+            guard !matches.isEmpty else { return true }
+
+            if micWords.count < 4 {
+                let micCenter = (mic.start + mic.end) / 2
+                // Only suppress short near-verbatim echoes from system audio;
+                // preserve genuine simultaneous answers with different text.
+                let duplicate = matches.contains { sys in
+                    TranscriptText.wordTokens(sys.text) == micWords
+                        && abs((sys.start + sys.end) / 2 - micCenter) <= 0.75
+                }
+                return !duplicate
+            }
+
+            // Preserve the original threshold for longer phrases. This also
+            // compares the concatenated text from multiple diarization turns,
+            // which the previous per-turn-only filter could not recognize.
+            let individuallyMatched = matches.contains {
+                TranscriptText.covers(mic.text, by: $0.text, atLeast: 0.6)
+            }
+            let combined = matches
+                .sorted { $0.start < $1.start }
+                .map(\.text)
+                .joined(separator: " ")
+            let combinedMatched = TranscriptText.covers(
+                mic.text, by: combined, atLeast: 0.6)
+            return !(individuallyMatched || combinedMatched)
         }
     }
 

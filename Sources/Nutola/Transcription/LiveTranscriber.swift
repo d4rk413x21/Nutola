@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import Speech
+import FluidAudio
 
 /// Real-time, on-device transcription that runs *alongside* recording to feed the
 /// live UI and the `get_live_transcript` MCP tool. Two streaming SpeechTranscribers
@@ -109,6 +110,7 @@ final class LiveTranscriber: @unchecked Sendable {
   /// Nil means "auto" — the transcriber adapts mid-stream across the
   /// reserved locales. Must be set before `start()` runs.
   var localeOverride: Locale?
+  var selectedModel: TranscriptionModel = .apple
 
   init(startDate: Date, timeOffset: TimeInterval = 0) {
     self.startDate = startDate
@@ -125,6 +127,11 @@ final class LiveTranscriber: @unchecked Sendable {
       return was
     }
     guard !alreadyStarted else { return }
+
+    if selectedModel != .apple {
+      try await startParakeet()
+      return
+    }
 
     guard SpeechTranscriber.isAvailable else {
       NutolaConsoleLog.live("unavailable — speech model not ready")
@@ -176,6 +183,93 @@ final class LiveTranscriber: @unchecked Sendable {
       NutolaConsoleLog.live(
         "channels ready (mic + system) headphoneBleed=\(lock.withLock { headphoneBleedMode })")
     }
+  }
+
+  /// Two independent streaming sessions reuse the same downloaded/loaded model
+  /// weights. The sliding-window engine publishes partial text after overlapping
+  /// windows; final audio still gets a separate full batch ASR pass.
+  private func startParakeet() async throws {
+    let models = try await FluidParakeetModelCache.shared.get(selectedModel)
+    let mic = try await makeParakeetChannel(models: models, speakerID: Self.youSpeakerID)
+    let system: Channel
+    do {
+      system = try await makeParakeetChannel(models: models, speakerID: Self.othersSpeakerID)
+    } catch {
+      await Self.teardown([mic])
+      throw error
+    }
+    let published = lock.withLock {
+      guard !stopped else { return false }
+      channels = [mic, system]
+      return true
+    }
+    if !published { await Self.teardown([mic, system]) }
+    NutolaConsoleLog.live("Parakeet sliding-window live ready model=\(selectedModel.rawValue)")
+  }
+
+  private func makeParakeetChannel(models: AsrModels, speakerID: String) async throws -> Channel {
+    let engine = SlidingWindowAsrManager(config: SlidingWindowAsrConfig(
+      chunkSeconds: 8,
+      hypothesisChunkSeconds: 1,
+      leftContextSeconds: 2,
+      rightContextSeconds: 2
+    ))
+    try await engine.loadModels(models)
+    try await engine.startStreaming(source: speakerID == Self.youSpeakerID ? .microphone : .system)
+
+    let (stream, input) = AsyncStream<AVAudioPCMBuffer>.makeStream(
+      bufferingPolicy: .bufferingNewest(64))
+    let sourceTask = Task.detached { [weak self] in
+      for await buffer in stream { await engine.streamAudio(buffer) }
+      do {
+        let final = try await engine.finish()
+        self?.handleParakeetText(final, speakerID: speakerID, finalized: true)
+      } catch {
+        NutolaConsoleLog.live("Parakeet \(speakerID) finalization failed: \(error.localizedDescription)")
+      }
+      await engine.cleanup()
+    }
+    let updateTask = Task.detached { [weak self] in
+      let updates = await engine.transcriptionUpdates
+      for await _ in updates {
+        let confirmed = await engine.confirmedTranscript
+        let volatile = await engine.volatileTranscript
+        let text = [confirmed, volatile].filter { !$0.isEmpty }.joined(separator: " ")
+        self?.handleParakeetText(text, speakerID: speakerID, finalized: false)
+      }
+    }
+
+    return Channel(
+      speakerID: speakerID,
+      rawContinuation: input,
+      tasks: [sourceTask, updateTask])
+  }
+
+  private func handleParakeetText(_ text: String, speakerID: String, finalized: Bool) {
+    let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let elapsed = max(0, Date().timeIntervalSince(startDate)) + timeOffset
+    let speaker = speakerID == Self.othersSpeakerID
+      ? (platformSpeakerResolver?(elapsed) ?? speakerID)
+      : speakerID
+    let (segments, vol, callback) = lock.withLock {
+      if finalized {
+        volatile[speakerID] = nil
+        if !cleaned.isEmpty {
+          finalizedAppend(TranscriptSegment(
+            speakerID: speaker, start: elapsed, end: elapsed, text: cleaned))
+        }
+      } else {
+        volatile[speakerID] = cleaned.isEmpty ? nil : cleaned
+      }
+      return (self.finalized, Self.formattedVolatile(volatile), onUpdate)
+    }
+    callback?(segments, vol)
+  }
+
+  private func finalizedAppend(_ segment: TranscriptSegment) {
+    var idx = finalized.count
+    while idx > 0 && finalized[idx - 1].start > segment.start { idx -= 1 }
+    finalized.insert(segment, at: idx)
   }
 
   /// Labels each channel's in-progress fragment for the live UI.

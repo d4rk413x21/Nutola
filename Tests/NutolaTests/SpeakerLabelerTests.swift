@@ -308,6 +308,39 @@ final class SpeakerLabelerTests: XCTestCase {
         XCTAssertTrue(meTexts.contains { $0.contains("sounds good") }, "genuine mic line kept")
     }
 
+    func testAcousticEvidenceDropsPlaybackButKeepsDifferentLocalSpeech() {
+        let remoteWords = [word("aggiorniamo", 1, 1.6), word("il", 1.6, 1.8),
+                           word("database", 1.8, 2.5), word("domani", 2.5, 3)]
+        let system = TranscriptionOutput(words: remoteWords, segments: [])
+        let mic = TranscriptionOutput(words: [], segments: [
+            word("aggiorniamo il database domani", 1, 3),
+            word("io preparo il backup", 4, 5)
+        ])
+        let wave: [Float] = (0..<400).map { i in
+            Float(0.02 + 0.03 * abs(sin(Double(i) * 0.17))
+                + 0.02 * abs(cos(Double(i) * 0.07)))
+        }
+        let evidence = AcousticEchoEvidence(microphone: wave, system: wave)
+        let (segments, _) = SpeakerLabeler.label(
+            mic: mic, system: system, systemTurns: nil,
+            myName: "Me", echoEvidence: evidence)
+        XCTAssertFalse(segments.contains { $0.speakerID == "me" && $0.text.contains("aggiorniamo") })
+        XCTAssertTrue(segments.contains { $0.speakerID == "me" && $0.text == "io preparo il backup" })
+    }
+
+    func testEchoWithoutAcousticAgreementKeepsMic() {
+        let transcript = "dobbiamo verificare il deploy"
+        let mic = TranscriptionOutput(words: [], segments: [word(transcript, 1, 3)])
+        let system = TranscriptionOutput(words: [], segments: [word(transcript, 1, 3)])
+        let evidence = AcousticEchoEvidence(
+            microphone: Array(repeating: 0, count: 250),
+            system: Array(repeating: 0, count: 250))
+        let (segments, _) = SpeakerLabeler.label(
+            mic: mic, system: system, systemTurns: nil,
+            myName: "Me", echoEvidence: evidence)
+        XCTAssertTrue(segments.contains { $0.speakerID == "me" })
+    }
+
     func testKeepsShortMicBackchannel() {
         // A brief affirmation that happens to echo shouldn't be nuked.
         let system = TranscriptionOutput(words: [word("yeah", 3.0, 3.4)], segments: [])

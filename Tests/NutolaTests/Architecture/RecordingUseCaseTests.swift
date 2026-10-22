@@ -27,6 +27,26 @@ final class RecordingUseCaseTests: XCTestCase {
         XCTAssertEqual(meetings.meeting(id: handle.meeting.id)?.duration, 0)
     }
 
+    func testStopAwaitsCaptureFinalizationBeforeProcessing() async {
+        let meetings = MockMeetingRepository()
+        let recording = MockRecordingService()
+        let handle = ArchitectureFixtures.recordingHandle(repository: meetings)
+        recording.stopPair = (handle.session, handle.meeting)
+        let processing = MockProcessingService()
+        let processUC = ProcessMeetingUseCase(
+            meetingRepository: meetings,
+            processingService: processing,
+            notificationService: MockNotificationService())
+        let stop = StopRecordingUseCase(
+            recordingService: recording,
+            meetingRepository: meetings,
+            processMeeting: processUC)
+
+        _ = await stop.execute()
+        XCTAssertEqual(recording.stopCallCount, 1)
+        XCTAssertEqual(processing.processCallCount, 1)
+    }
+
     func testStopRecordingReturnsNilWhenNothingActive() async {
         let meetings = MockMeetingRepository()
         let recording = MockRecordingService()

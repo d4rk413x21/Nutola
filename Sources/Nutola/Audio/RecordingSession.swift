@@ -157,7 +157,6 @@ final class RecordingSession: ObservableObject {
     let live = LiveTranscriber(startDate: startedAt, timeOffset: elapsedOffset)
     live.headphoneBleedMode = MicRecorder.headphoneBleedLikely
     live.localeOverride = transcriptionLocale
-    live.selectedModel = AppSettings.transcriptionModel
     if live.headphoneBleedMode {
       NutolaConsoleLog.recording("headphone bleed mode — mic bleed will attribute to Others")
     }
@@ -259,7 +258,6 @@ final class RecordingSession: ObservableObject {
     let live = LiveTranscriber(startDate: startedAt, timeOffset: elapsedOffset)
     live.headphoneBleedMode = MicRecorder.headphoneBleedLikely
     live.localeOverride = transcriptionLocale
-    live.selectedModel = AppSettings.transcriptionModel
     if live.headphoneBleedMode {
       NutolaConsoleLog.recording("headphone bleed mode — mic bleed will attribute to Others")
     }

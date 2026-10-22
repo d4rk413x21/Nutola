@@ -18,8 +18,8 @@ final class TranscriptionModelTests: XCTestCase {
     }
 
     func testLiveAndBatchSupport() {
-        XCTAssertTrue(TranscriptionModel.parakeetRedux.supportsLiveTranscription)
-        XCTAssertTrue(TranscriptionModel.parakeetUltra.supportsLiveTranscription)
+        XCTAssertFalse(TranscriptionModel.parakeetRedux.supportsLiveTranscription)
+        XCTAssertFalse(TranscriptionModel.parakeetUltra.supportsLiveTranscription)
         XCTAssertTrue(TranscriptionModel.apple.supportsLiveTranscription)
     }
 

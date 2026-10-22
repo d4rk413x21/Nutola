@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 /// Post-recording pipeline: transcribe both channels → identify speakers →
@@ -51,19 +52,29 @@ enum ProcessingPipeline {
         onSummary: @escaping @Sendable (SummaryUpdate) -> Void = { _ in }
     ) async -> Outcome {
         let id = meeting.id
-        let priorSegments = archive.transcript(for: id)
+        let storedTranscript = archive.transcript(for: id)
+        let liveSegments = archive.liveTranscript(for: id)
+        // ProcessingUseCase preserves the live draft in transcript.json before
+        // starting ASR. It is provisional, NOT a previous recording. Remove
+        // only an exact shifted suffix, so final ASR replaces rather than
+        // duplicates it; earlier sessions and user-edited turns remain intact.
+        let priorSegments = Self.priorSegmentsExcludingPromotedLive(
+            storedTranscript, live: liveSegments)
         let appendOffset = Self.appendOffset(meeting: meeting, prior: priorSegments)
         let micURL = archive.micURL(for: id)
         let systemURL = archive.systemURL(for: id)
-        let hasMic = FileManager.default.fileExists(atPath: micURL.path)
-        let hasSystem = FileManager.default.fileExists(atPath: systemURL.path)
+        let hasMic = Self.hasUsableAudio(at: micURL)
+        let hasSystem = Self.hasUsableAudio(at: systemURL)
+        if !hasSystem && FileManager.default.fileExists(atPath: systemURL.path) {
+            NutolaConsoleLog.pipeline(
+                "system audio has no decodable samples (recording may have contained no playback); skipping ASR and diarization")
+        }
         var notices: [String] = meeting.notice.map { [$0] } ?? []
         var outcome = Outcome(state: .ready)
 
         // 0. Draft the notes from the live transcript first, so they appear seconds
         //    after Stop (streamed token by token) while the accurate transcript is
         //    still being built. A failed draft just falls through to the batch pass.
-        let liveSegments = archive.liveTranscript(for: id)
         NutolaConsoleLog.pipeline(
             "run meeting=\(id.uuidString.prefix(8)) title=\"\(meeting.title)\" mic=\(hasMic) system=\(hasSystem)"
                 + " live=\(liveSegments.count) prior=\(priorSegments.count) duration=\(Int(meeting.duration))s")
@@ -327,6 +338,40 @@ enum ProcessingPipeline {
             TranscriptText.wordTokens(segs.map(\.text).joined(separator: " "))
         }
         return signature(a) == signature(b)
+    }
+
+    /// Detect the exact live segment suffix promoted by ProcessMeetingUseCase.
+    /// Never fuzzy-match text: two genuinely repeated utterances must not be
+    /// discarded just because their words look similar.
+    static func priorSegmentsExcludingPromotedLive(
+        _ stored: [TranscriptSegment], live: [TranscriptSegment]
+    ) -> [TranscriptSegment] {
+        guard !live.isEmpty, stored.count >= live.count else { return stored }
+        let suffix = Array(stored.suffix(live.count))
+        guard let firstStored = suffix.first, let firstLive = live.first else {
+            return stored
+        }
+        let shift = firstStored.start - firstLive.start
+        guard shift >= 0 else { return stored }
+        let matches = zip(suffix, live).allSatisfy { pair in
+            let saved = pair.0
+            let provisional = pair.1
+            return saved.speakerID == provisional.speakerID
+                && saved.text == provisional.text
+                && abs(saved.start - provisional.start - shift) < 0.001
+                && abs(saved.end - provisional.end - shift) < 0.001
+        }
+        return matches ? Array(stored.dropLast(live.count)) : stored
+    }
+
+    /// AAC containers can exist on disk with no decoded audio frames (~557 B).
+    /// Test the decoded frame count rather than the file's byte size. Parakeet
+    /// requires at least 300 ms of audio at 16 kHz.
+    static func hasUsableAudio(at url: URL) -> Bool {
+        guard let file = try? AVAudioFile(forReading: url) else { return false }
+        let sampleRate = file.processingFormat.sampleRate
+        guard sampleRate.isFinite, sampleRate > 0 else { return false }
+        return Double(file.length) / sampleRate >= 0.3
     }
 
     static func appendOffset(meeting: Meeting, prior: [TranscriptSegment]) -> TimeInterval {

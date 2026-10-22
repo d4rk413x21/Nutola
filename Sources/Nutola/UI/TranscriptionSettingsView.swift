@@ -204,12 +204,21 @@ struct TranscriptionSettings: View {
         model.logModelEvent("starting download")
         downloadTask = Task {
             do {
-                try await model.downloadModel { fraction in
-                    Task { @MainActor in progress = fraction }
+                let selectedModel = model
+                try await selectedModel.downloadModel { fraction in
+                    Task { @MainActor in
+                        // Progress may be delivered on background queues.
+                        // Avoid backwards jumps when FluidAudio starts a new file.
+                        if model == selectedModel {
+                            progress = max(progress, min(1, max(0, fraction)))
+                        }
+                    }
                 }
-                await MainActor.run {
-                    Task { await refresh() }
+                await refresh()
+                if installed {
                     model.logModelEvent("model installed")
+                } else {
+                    self.error = "Model files downloaded but installation could not be verified."
                 }
             } catch is CancellationError {
                 model.logModelEvent("download cancelled")
@@ -217,10 +226,8 @@ struct TranscriptionSettings: View {
                 await MainActor.run { self.error = error.localizedDescription }
                 model.logModelEvent("download failed — \(error.localizedDescription)")
             }
-            await MainActor.run {
-                downloading = false
-                downloadTask = nil
-            }
+            downloading = false
+            downloadTask = nil
         }
     }
 

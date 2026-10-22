@@ -25,130 +25,47 @@ enum Transcriber {
         await TranscriptionLocales.modelsInstalled()
     }
 
-    /// Which ASR engine the pipeline should actually run for a given selection.
-    ///
-    /// The selection is a pure, side-effect-free decision: it inspects the model
-    /// files on disk and the availability of the wired inference engine, then
-    /// reports what the pipeline should do. Callers branch on the result and log
-    /// a clear message on fallback. Keeping the decision separate from the async
-    /// audio path lets tests verify model selection without real audio.
     enum EngineDecision: Equatable {
-        /// Use the Apple SpeechAnalyzer / SpeechTranscriber path.
         case apple
-        /// A Soniqo Parakeet CoreML model is downloaded, but Nutola has not wired its
-        /// inference engine yet — fall back to Apple with an explanatory log.
-        case parakeetInstalledButNoInference(TranscriptionModel)
-        /// The Parakeet model is selected but its weights aren't on disk (and no
-        /// inference engine is wired either) — fall back to Apple. Distinct from
-        /// `parakeetInstalledButNoInference` so the log and tests can tell whether
-        /// the user's download actually landed.
-        case parakeetNotInstalled(TranscriptionModel)
-        /// Nemotron weights can be downloaded but the inference runner is not wired
-        /// yet — fall back to Apple with an explanatory log.
-        case nemotronNotAvailable
+        case parakeet(TranscriptionModel)
     }
 
-    /// Resolves which engine a transcription should run for the user's selected
-    /// model. Apple is always available on supported hardware; the downloadable
-    /// engines require their weights on disk *and* an inference engine wired into
-    /// Nutola. Today only Apple's path is wired, so Parakeet/Nemotron selections
-    /// report their fallback reason here rather than in the audio hot path.
-    ///
-    /// `selected` defaults to `AppSettings.transcriptionModel` so the production
-    /// pipeline branches on the user's Settings choice; tests pass an explicit
-    /// model to assert each branch without touching UserDefaults or audio.
     static func resolveEngine(for selected: TranscriptionModel? = nil) -> EngineDecision {
         let model = selected ?? AppSettings.transcriptionModel
         switch model {
-        case .apple:
-            return .apple
-        case .parakeetStreaming, .parakeetBatch:
-            // The CoreML weights live under Application Support and are checked
-            // for real (see TranscriptionModel.isModelInstalled). In both cases
-            // we fall back to Apple — Nutola has no Parakeet inference engine
-            // wired yet (SoniqoModelStore manages bytes only) — but the decision
-            // distinguishes whether the user's download landed, so the log and
-            // tests can confirm the real model-file check happened.
-            return model.isModelInstalled
-                ? .parakeetInstalledButNoInference(model)
-                : .parakeetNotInstalled(model)
-        case .nemotron:
-            return .nemotronNotAvailable
+        case .apple: .apple
+        case .parakeetRedux, .parakeetUltra: .parakeet(model)
         }
     }
 
-    /// Ensures the model for the user's selected engine is available, then the
-    /// Apple fallback (which is what actually runs today). Passing `selected`
-    /// makes the model choice injectable for tests.
     static func ensureModel(
         progress: (@Sendable (Double) -> Void)?,
         selected: TranscriptionModel? = nil
     ) async throws {
         let model = selected ?? AppSettings.transcriptionModel
-
-        // Ensure the selected model's weights are on disk when Nutola's inference
-        // engine for them ships. Today the engines aren't wired, so the download
-        // is only meaningful once they are — but honoring the selection keeps the
-        // `ensure` contract honest (the user asked for this model).
-        if model.isDownloadable, !model.isModelInstalled {
-            do {
-                try await model.downloadModel(progress: { fraction in
-                    progress?(fraction)
-                })
-            } catch {
-                // A failed download must not block transcription — Apple is the
-                // fallback and only needs its on-device assets, ensured below.
-                model.logModelEvent("download failed — \(error.localizedDescription); falling back to Apple")
-            }
+        if model == .apple {
+            try await TranscriptionLocales.ensureModels(progress: progress)
+        } else {
+            try await FluidParakeetModels.download(model)
+            progress?(1)
         }
-
-        // Apple is the wired fallback for every engine today, so its assets must
-        // be present regardless of the selection.
-        try await TranscriptionLocales.ensureModels(progress: progress)
     }
 
-    /// Back-compat entry point used by `ProcessingPipeline` and existing tests.
-    /// Branches on the user's selected transcription model (AppSettings).
     static func transcribeFile(at url: URL) async throws -> TranscriptionOutput {
         try await transcribeFile(at: url, selected: AppSettings.transcriptionModel, locale: nil)
     }
 
-    /// Transcribes a file using the selected engine, falling back to Apple's
-    /// SpeechAnalyzer when the selected engine's inference isn't wired.
     static func transcribeFile(
         at url: URL,
         selected: TranscriptionModel?,
         locale: Locale? = nil
     ) async throws -> TranscriptionOutput {
-        let model = selected ?? AppSettings.transcriptionModel
-        let decision = resolveEngine(for: model)
-        switch decision {
+        switch resolveEngine(for: selected) {
         case .apple:
             return try await transcribeWithApple(at: url, locale: locale)
-        case .parakeetInstalledButNoInference(let selected):
-            // The weights are on disk, but Nutola has no Parakeet inference engine
-            // wired yet (SoniqoModelStore manages bytes only). Fall back to Apple
-            // rather than fail the whole meeting.
-            NutolaConsoleLog.soniqo(
-                "Parakeet model selected but inference not available — falling back to Apple Speech"
-                + " (\(selected.rawValue))")
-            NutolaConsoleLog.transcribe(
-                "file \(url.lastPathComponent) via Apple (fallback from \(selected.rawValue))")
-            return try await transcribeWithApple(at: url, locale: locale)
-        case .parakeetNotInstalled(let selected):
-            // No weights on disk and no inference engine wired — the user hasn't
-            // downloaded the model (or the download failed). Fall back to Apple.
-            NutolaConsoleLog.soniqo(
-                "Parakeet model selected (\(selected.rawValue)) but not installed — falling back to Apple Speech")
-            NutolaConsoleLog.transcribe(
-                "file \(url.lastPathComponent) via Apple (fallback from \(selected.rawValue), not installed)")
-            return try await transcribeWithApple(at: url, locale: locale)
-        case .nemotronNotAvailable:
-            NutolaConsoleLog.nemotron(
-                "Nemotron engine not yet available — falling back to Apple Speech")
-            NutolaConsoleLog.transcribe(
-                "file \(url.lastPathComponent) via Apple (fallback from nemotron)")
-            return try await transcribeWithApple(at: url, locale: locale)
+        case .parakeet(let model):
+            // Do not silently claim a Parakeet transcription if it failed.
+            return try await FluidParakeetTranscriber.transcribeFile(at: url, model: model)
         }
     }
 

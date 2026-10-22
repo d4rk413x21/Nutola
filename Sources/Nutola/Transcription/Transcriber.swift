@@ -15,7 +15,7 @@ enum TranscriberError: LocalizedError {
         case .modelUnavailable:
             return "On-device transcription isn't supported on this Mac."
         case .emptyAudio:
-            return "The recording contains no audio."
+            return "No speech was recognized in this audio track."
         }
     }
 }

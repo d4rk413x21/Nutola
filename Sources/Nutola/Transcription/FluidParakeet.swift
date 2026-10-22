@@ -59,36 +59,74 @@ enum FluidParakeetModels {
         progress(1)
     }
 
-    static func installedBytes(_ model: TranscriptionModel) -> Int64 {
-        guard model != .apple else { return 0 }
-        guard let enumerator = FileManager.default.enumerator(
-            at: directory(for: model), includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey]
-        ) else { return 0 }
+    /// AsrModels.download(to:) takes a *hint* directory, and ModelHub resolves
+    /// its actual cache to a sibling folder. Different FluidAudio releases have
+    /// used both names. The working model files on existing Macs can therefore
+    /// be in "parakeet-ultra" or "parakeet-ultra-coreml" (and likewise Redux).
+    ///
+    /// Only these model-specific, whitelisted directories are ever measured or
+    /// removed. FluidAudio's shared diarization cache is not included.
+    static func storageDirectories(
+        for model: TranscriptionModel,
+        root: URL = MeetingArchive.defaultRoot
+    ) -> [URL] {
+        let basename: String
+        switch model {
+        case .parakeetRedux: basename = "parakeet-redux"
+        case .parakeetUltra: basename = "parakeet-ultra"
+        case .apple: return []
+        }
+        let parent = root.appendingPathComponent("Models/FluidParakeet", isDirectory: true)
+        return [
+            parent.appendingPathComponent(basename, isDirectory: true),
+            parent.appendingPathComponent(basename + "-coreml", isDirectory: true),
+        ]
+    }
+
+    static func installedBytes(
+        _ model: TranscriptionModel,
+        root: URL = MeetingArchive.defaultRoot
+    ) -> Int64 {
+        let fm = FileManager.default
         var bytes: Int64 = 0
-        for case let file as URL in enumerator {
-            let attributes = try? file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
-            if attributes?.isRegularFile == true { bytes += Int64(attributes?.fileSize ?? 0) }
+        for directory in storageDirectories(for: model, root: root) {
+            guard let enumerator = fm.enumerator(
+                at: directory,
+                includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey]
+            ) else { continue }
+            for case let file as URL in enumerator {
+                let properties = try? file.resourceValues(
+                    forKeys: [.isRegularFileKey, .fileSizeKey])
+                if properties?.isRegularFile == true {
+                    bytes += Int64(properties?.fileSize ?? 0)
+                }
+            }
         }
         return bytes
     }
 
     @discardableResult
-    static func delete(_ model: TranscriptionModel) throws -> Int64 {
-        guard model != .apple else { return 0 }
-        let dir = directory(for: model)
-        let bytes = installedBytes(model)
-        if FileManager.default.fileExists(atPath: dir.path) {
-            try FileManager.default.removeItem(at: dir)
+    static func delete(
+        _ model: TranscriptionModel,
+        root: URL = MeetingArchive.defaultRoot
+    ) throws -> Int64 {
+        let fm = FileManager.default
+        let freedBytes = installedBytes(model, root: root)
+        for directory in storageDirectories(for: model, root: root) {
+            if fm.fileExists(atPath: directory.path) {
+                try fm.removeItem(at: directory)
+                NutolaConsoleLog.transcribe("removed \(model.rawValue) cache at \(directory.path)")
+            }
         }
-        return bytes
+        return freedBytes
     }
 
     static func reveal(_ model: TranscriptionModel) {
-        let dir = directory(for: model)
-        NSWorkspace.shared.activateFileViewerSelecting([
-            FileManager.default.fileExists(atPath: dir.path)
-                ? dir : dir.deletingLastPathComponent()
-        ])
+        let fm = FileManager.default
+        let directories = storageDirectories(for: model)
+        let selected = directories.first { fm.fileExists(atPath: $0.path) }
+            ?? directory(for: model).deletingLastPathComponent()
+        NSWorkspace.shared.activateFileViewerSelecting([selected])
     }
 
     /// Does not delete any user data until explicitly invoked from Settings.

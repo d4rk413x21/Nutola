@@ -33,8 +33,10 @@ enum Transcriber {
     static func resolveEngine(for selected: TranscriptionModel? = nil) -> EngineDecision {
         let model = selected ?? AppSettings.transcriptionModel
         switch model {
-        case .apple: .apple
-        case .parakeetRedux, .parakeetUltra: .parakeet(model)
+        case .apple:
+            return .apple
+        case .parakeetRedux, .parakeetUltra:
+            return .parakeet(model)
         }
     }
 

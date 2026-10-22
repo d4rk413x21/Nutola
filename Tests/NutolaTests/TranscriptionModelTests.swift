@@ -30,6 +30,14 @@ final class TranscriptionModelTests: XCTestCase {
         XCTAssertTrue(TranscriptionModel.parakeetRedux.isDownloadable)
     }
 
+    func testFluidAudioModelDirectoriesUseRealRepositoryNames() {
+        let redux = FluidParakeetModels.directory(for: .parakeetRedux)
+        let ultra = FluidParakeetModels.directory(for: .parakeetUltra)
+        XCTAssertEqual(redux.lastPathComponent, "parakeet-redux-coreml")
+        XCTAssertEqual(ultra.lastPathComponent, "parakeet-ultra-coreml")
+        XCTAssertEqual(redux.deletingLastPathComponent(), ultra.deletingLastPathComponent())
+    }
+
     func testModelSettingRoundTrips() {
         for model in TranscriptionModel.allCases {
             UserDefaults.standard.set(model.rawValue, forKey: SettingsKey.transcriptionModel)

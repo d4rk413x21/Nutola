@@ -6,7 +6,7 @@ let package = Package(
     defaultLocalization: "en",
     platforms: [.macOS(.v26)],
     dependencies: [
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.15.5"),
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.17.7"),
     ],
     targets: [
         // Tiny ObjC shim whose sole job is to run an AVAudioNode tap-install (and

@@ -38,7 +38,7 @@ struct StopRecordingUseCase {
     let processMeeting: ProcessMeetingUseCase
 
     func execute() async -> Meeting? {
-        guard let (session, meeting) = recordingService.stop() else { return nil }
+        guard let (session, meeting) = await recordingService.stop() else { return nil }
         var fresh = meetingRepository.meeting(id: meeting.id) ?? meeting
         fresh.duration = session.elapsed
         meetingRepository.upsert(fresh)

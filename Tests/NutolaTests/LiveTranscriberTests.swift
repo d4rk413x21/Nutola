@@ -122,6 +122,47 @@ final class LiveTranscriberTests: XCTestCase {
         XCTAssertEqual(segments.map(\.speakerID), ["them"])
     }
 
+    func testSpeakerphoneEchoMatchesRemoteTextWithoutHeadphones() {
+        let local = seg("me", 100.4, "dobbiamo aggiornare i dati delle statistiche")
+        let remote = seg("them", 100.0, "Dobbiamo aggiornare i dati delle statistiche")
+        XCTAssertTrue(LiveTranscriber.isPlaybackEcho(local, among: [remote]))
+    }
+
+    func testSpeakerphoneEchoMatchesNamedRemoteSpeaker() {
+        let local = seg("me", 120.2, "bisogna aggiornare la procedura al più presto")
+        let remote = seg("Giulia", 121.3, "bisogna aggiornare la procedura al più presto")
+        XCTAssertTrue(LiveTranscriber.isPlaybackEcho(local, among: [remote]))
+    }
+
+    func testSpeakerphoneEchoMatchesSplitRemoteSentences() {
+        let local = seg("me", 155, "dobbiamo completare la migrazione dello storage")
+        let remote = [
+            seg("them", 154, "dobbiamo completare la migrazione"),
+            seg("them", 156, "dello storage")
+        ]
+        XCTAssertTrue(LiveTranscriber.isPlaybackEcho(local, among: remote))
+    }
+
+    func testSpeakerphoneEchoPreservesRealLocalInterruption() {
+        let local = seg("me", 50.2, "no la modifica va fatta dopo il rilascio")
+        let remote = seg("them", 50, "la migrazione dello storage è pronta")
+        XCTAssertFalse(LiveTranscriber.isPlaybackEcho(local, among: [remote]))
+    }
+
+    func testSpeakerphoneEchoDoesNotDeleteDifferentConversation() {
+        let local = seg("me", 90, "dobbiamo completare la migrazione dello storage")
+        let remote = seg("them", 80, "dobbiamo completare la migrazione dello storage")
+        XCTAssertFalse(LiveTranscriber.isPlaybackEcho(local, among: [remote]))
+    }
+
+    func testUnverifiedMicrophoneVolatileHiddenOnlyDuringPlayback() {
+        let texts = ["me": "parlo io", "them": "parlano gli altri"]
+        let masked = LiveTranscriber.formattedVolatile(texts, suppressUnverifiedMic: true)
+        XCTAssertFalse(masked.contains("parlo io"))
+        XCTAssertTrue(masked.contains("parlano gli altri"))
+        XCTAssertTrue(LiveTranscriber.formattedVolatile(texts).contains("parlo io"))
+    }
+
     func testFormattedVolatileLabelsChannels() {
         let text = LiveTranscriber.formattedVolatile([
             LiveTranscriber.youSpeakerID: "hello",

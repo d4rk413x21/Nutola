@@ -14,10 +14,20 @@ enum FluidParakeetModels {
         }
     }
 
+    // FluidAudio's ModelHub interprets the argument to AsrModels.download(to:)
+    // as a repo-specific directory, but saves models under that directory's
+    // parent using Repo.folderName. Return that exact location everywhere:
+    // downloading, checking installation, displaying size, revealing and deleting.
     static func directory(for model: TranscriptionModel) -> URL {
-        MeetingArchive.defaultRoot
+        let repoFolder: String
+        switch model {
+        case .parakeetRedux: repoFolder = "parakeet-redux-coreml"
+        case .parakeetUltra: repoFolder = "parakeet-ultra-coreml"
+        case .apple: repoFolder = "apple"
+        }
+        return MeetingArchive.defaultRoot
             .appendingPathComponent("Models/FluidParakeet", isDirectory: true)
-            .appendingPathComponent(model.rawValue, isDirectory: true)
+            .appendingPathComponent(repoFolder, isDirectory: true)
     }
 
     static func isInstalled(_ model: TranscriptionModel) -> Bool {
@@ -25,9 +35,28 @@ enum FluidParakeetModels {
         return AsrModels.modelsExist(at: directory(for: model), version: version(for: model))
     }
 
-    static func download(_ model: TranscriptionModel) async throws {
+    static func download(
+        _ model: TranscriptionModel,
+        progress: @Sendable @escaping (Double) -> Void = { _ in }
+    ) async throws {
         guard model != .apple else { return }
-        _ = try await AsrModels.download(to: directory(for: model), version: version(for: model))
+        // Do not re-download intact weights already present in the correct
+        // FluidAudio cache directory (including assets downloaded by older Nutola).
+        if isInstalled(model) {
+            progress(1)
+            return
+        }
+        _ = try await AsrModels.download(
+            to: directory(for: model),
+            version: version(for: model),
+            progressHandler: { update in
+                progress(min(0.99, max(0, update.fractionCompleted)))
+            }
+        )
+        guard isInstalled(model) else {
+            throw AsrModelsError.loadingFailed("The Parakeet model download finished, but required files were not found.")
+        }
+        progress(1)
     }
 
     static func installedBytes(_ model: TranscriptionModel) -> Int64 {

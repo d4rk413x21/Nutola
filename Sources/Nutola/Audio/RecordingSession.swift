@@ -444,12 +444,10 @@ final class RecordingSession: ObservableObject {
   /// process sees a fresh file without thrashing the disk).
   private func applyLive(_ segments: [TranscriptSegment], _ volatile: String) {
     volatileText = volatile
-    // The finalized transcript only ever grows, so a count change is a cheap,
-    // exact "did it actually change?" test. Interim (volatile) updates arrive
-    // several times a second and leave the finalized list untouched — skipping
-    // the republish + full re-render + disk write on those is what keeps a
-    // multi-hour meeting from getting steadily heavier as the transcript grows.
-    guard segments.count != liveSegments.count else { return }
+    // Echo detection can retract a previously attributed mic sentence
+    // and replace it with system speech without changing the segment count.
+    // Comparing only counts leaves stale "You" labels on screen and in live.json.
+    guard segments != liveSegments else { return }
     liveSegments = segments
     let now = Date()
     if now.timeIntervalSince(lastLivePersist) >= 1.5 {
@@ -566,9 +564,12 @@ final class RecordingSession: ObservableObject {
   private func flushLiveTranscriberAsync() async {
     guard let live = liveTranscriber else { return }
     liveTranscriber = nil
-    await live.stop()
-    archive.saveLiveTranscript(liveSegments, for: meetingID)
-    NutolaConsoleLog.recording("live transcript flushed (\(liveSegments.count) segments)")
+    let completed = await live.stop()
+    // Do not rely on main-actor callback scheduling: the final batch pipeline
+    // must persist the fully resolved (echo-filtered) live segments.
+    liveSegments = completed
+    archive.saveLiveTranscript(completed, for: meetingID)
+    NutolaConsoleLog.recording("live transcript flushed (\(completed.count) segments)")
   }
 
   /// Stop the mic/system recorders (off the main actor, when called via

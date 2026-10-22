@@ -385,9 +385,11 @@ final class RecordingSession: ObservableObject {
         guard !Task.isCancelled, let self, self.systemStarted, !self.tap.signalDetected else {
           return
         }
-        let input = MicRecorder.defaultInputDeviceName ?? "unknown"
+        let count = self.tap.currentCallbackCount
         NutolaConsoleLog.recording(
-          "system audio still silent after \(Int(Self.systemSignalCheckInterval))s (input=\(input)) — grant System Audio Recording in Privacy & Security → System Audio Recording Only"
+          count == 0
+            ? "system tap received no callbacks after \(Int(Self.systemSignalCheckInterval))s — confirm another app is playing audio; if so, check System Audio Recording permission"
+            : "system tap received audio buffers but no audible signal after \(Int(Self.systemSignalCheckInterval))s — confirm playback is audible and System Audio Recording is allowed"
         )
       }
       startSystemTapWatchdog()
@@ -410,8 +412,13 @@ final class RecordingSession: ObservableObject {
         try? await Task.sleep(for: .seconds(interval))
         guard !Task.isCancelled, let self, self.systemStarted else { return }
         let count = self.tap.currentCallbackCount
-        if count == lastCount {
-          // No new callbacks since last check — tap may have stalled.
+        if count == 0 {
+          // A process tap may legitimately receive no callbacks until another
+          // app plays sound. Repeatedly tearing down a never-active tap can
+          // interrupt permission initialization and does not diagnose silence.
+          stalledSince = nil
+        } else if count == lastCount {
+          // A previously active tap has stopped delivering callbacks.
           let since = stalledSince ?? Date()
           stalledSince = since
           if Date().timeIntervalSince(since) >= grace {

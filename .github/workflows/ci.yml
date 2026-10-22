@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-  workflow_dispatch: 
+  # Optional developer preview for any selected branch: not built on every PR.
+  workflow_dispatch:
 
 jobs:
   test:
@@ -25,4 +26,22 @@ jobs:
       - run: swift test
       # Model-dependent paths (FoundationModels, SpeechAnalyzer assets) are
       # unavailable on hosted runners; tests cover only pure logic by design.
-      # Distributable .app bundles are built only when publishing a GitHub release.
+      # Build a temporary, ad-hoc-signed .app only when this workflow is
+      # started explicitly from Actions -> CI -> Run workflow on a branch.
+      # Pushes and pull requests still run compile + tests without packaging.
+      - name: Assemble preview app (manual only)
+        if: github.event_name == 'workflow_dispatch'
+        run: make app
+
+      - name: Zip preview app (manual only)
+        if: github.event_name == 'workflow_dispatch'
+        run: ditto -c -k --keepParent dist/Nutola.app dist/Nutola.zip
+
+      - name: Upload preview artifact (manual only)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nutola-preview
+          path: dist/Nutola.zip
+          if-no-files-found: error
+          retention-days: 7

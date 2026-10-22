@@ -317,8 +317,7 @@ final class SpeakerLabelerTests: XCTestCase {
             word("io preparo il backup", 4, 5)
         ])
         let wave: [Float] = (0..<400).map { i in
-            Float(0.02 + 0.03 * abs(sin(Double(i) * 0.17))
-                + 0.02 * abs(cos(Double(i) * 0.07)))
+            { let x = Double(i); let a = abs(sin(x * 0.17)); let b = abs(cos(x * 0.07)); return Float(0.02 + 0.03 * a + 0.02 * b) }()
         }
         let evidence = AcousticEchoEvidence(microphone: wave, system: wave)
         let (segments, _) = SpeakerLabeler.label(

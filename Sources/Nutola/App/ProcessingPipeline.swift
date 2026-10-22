@@ -128,10 +128,29 @@ enum ProcessingPipeline {
         var systemOut: TranscriptionOutput?
         if hasMic {
             onProgress("Transcribing your microphone…")
-            do { micOut = try await Transcriber.transcribeFile(at: micURL, selected: AppSettings.transcriptionModel, locale: meetingLocale) }
-            catch {
-                notices.append(MeetingNotice.micTranscriptionFailed)
-                NutolaConsoleLog.pipeline("mic transcription failed — \(error.localizedDescription)")
+            do {
+                micOut = try await Transcriber.transcribeFile(
+                    at: micURL, selected: AppSettings.transcriptionModel, locale: meetingLocale)
+            } catch {
+                NutolaConsoleLog.pipeline("mic batch ASR unavailable — \(error.localizedDescription)")
+                // Parakeet may decode remote audio successfully but return an empty
+                // hypothesis for a quiet microphone track. Try the already-installed
+                // Apple Speech model on the mic only; never change the remote model.
+                if AppSettings.transcriptionModel != .apple {
+                    do {
+                        onProgress("Retrying microphone with Apple Speech…")
+                        micOut = try await Transcriber.transcribeFile(
+                            at: micURL, selected: .apple, locale: meetingLocale)
+                        NutolaConsoleLog.pipeline(
+                            "mic recovered via Apple Speech (\(micOut?.segments.count ?? 0) segments)")
+                    } catch {
+                        NutolaConsoleLog.pipeline(
+                            "mic Apple fallback unavailable — \(error.localizedDescription)")
+                    }
+                }
+                if micOut == nil {
+                    notices.append(MeetingNotice.micTranscriptionFailed)
+                }
             }
         }
         if hasSystem {
@@ -239,7 +258,11 @@ enum ProcessingPipeline {
         let offsetSegments = Self.offsetSegments(segments, by: appendOffset)
         let mergedSegments = priorSegments + offsetSegments
         try? archive.saveTranscript(mergedSegments, for: id)
-        outcome.speakers = Self.mergingSpeakers(existing: meeting.speakers, new: speakers)
+        // The meeting may still hold provisional live speakers ("me"/"them").
+        // Once the final transcript replaces live.json, never keep speaker
+        // identities that are absent from the saved transcript.
+        let allSpeakers = Self.mergingSpeakers(existing: meeting.speakers, new: speakers)
+        outcome.speakers = Self.speakersPresent(in: mergedSegments, from: allSpeakers)
         var labeled = meeting
         labeled.speakers = outcome.speakers ?? meeting.speakers
 
@@ -388,6 +411,13 @@ enum ProcessingPipeline {
             s.end += offset
             return s
         }
+    }
+
+    static func speakersPresent(
+        in segments: [TranscriptSegment], from speakers: [Speaker]
+    ) -> [Speaker] {
+        let present = Set(segments.map(\.speakerID))
+        return speakers.filter { present.contains($0.id) }
     }
 
     static func mergingSpeakers(existing: [Speaker], new: [Speaker]) -> [Speaker] {

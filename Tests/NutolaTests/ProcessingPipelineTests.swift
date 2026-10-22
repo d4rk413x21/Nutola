@@ -35,6 +35,58 @@ final class ProcessingPipelineTests: XCTestCase {
         XCTAssertFalse(ProcessingPipeline.sameContent(live, accurate))
     }
 
+    // MARK: - Promoted live transcript replacement
+
+    func testPromotedLiveDraftIsNotDuplicatedByFinalASR() {
+        let live = [
+            segAt("me", 1, 2, "ciao"),
+            segAt("me", 3, 4, "controlliamo il modello")
+        ]
+        let stored = live
+        XCTAssertTrue(
+            ProcessingPipeline.priorSegmentsExcludingPromotedLive(stored, live: live).isEmpty
+        )
+    }
+
+    func testPromotedLiveSuffixPreservesPreviousRecording() {
+        let prior = segAt("me", 0, 5, "sessione precedente")
+        let live = [
+            segAt("me", 1, 2, "nuova sessione"),
+            segAt("me", 3, 4, "verifichiamo l'audio")
+        ]
+        let stored = [prior] + ProcessingPipeline.offsetSegments(live, by: 60)
+        XCTAssertEqual(
+            ProcessingPipeline.priorSegmentsExcludingPromotedLive(stored, live: live),
+            [prior]
+        )
+    }
+
+    func testEditedLiveSegmentIsNotRemoved() {
+        let live = [segAt("me", 1, 2, "test")]
+        let edited = [segAt("me", 1, 2, "test modificato")]
+        XCTAssertEqual(
+            ProcessingPipeline.priorSegmentsExcludingPromotedLive(edited, live: live),
+            edited
+        )
+    }
+
+    func testRepeatedTextWithDifferentTimingIsPreserved() {
+        let live = [segAt("me", 1, 2, "ok")]
+        let unrelated = [segAt("me", 12, 17, "ok")]
+        XCTAssertEqual(
+            ProcessingPipeline.priorSegmentsExcludingPromotedLive(unrelated, live: live),
+            unrelated
+        )
+    }
+
+    func testEmptyAACLikeFileHasNoUsableAudio() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("nutola-empty-audio-\\(UUID().uuidString).m4a")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data(repeating: 0, count: 557).write(to: url)
+        XCTAssertFalse(ProcessingPipeline.hasUsableAudio(at: url))
+    }
+
     // MARK: - appendOffset / offsetSegments
 
     private func segAt(_ speakerID: String, _ start: TimeInterval, _ end: TimeInterval, _ text: String) -> TranscriptSegment {

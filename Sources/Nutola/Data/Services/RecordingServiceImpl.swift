@@ -231,12 +231,17 @@ final class RecordingServiceImpl: RecordingService {
     return .success(RecordingSessionHandle(session: newSession, meeting: meeting))
   }
 
-  func stop() -> (session: RecordingSession, meeting: Meeting)? {
+  func stop() async -> (session: RecordingSession, meeting: Meeting)? {
     guard let session = currentSession, let meeting = recordingMeeting else { return nil }
     NutolaConsoleLog.recording(
       "stop \(meeting.id.uuidString.prefix(8)) elapsed=\(Int(session.elapsed))s")
+    // Claim the session immediately so another stop cannot finalize it twice.
     clear()
-    session.stop()
+    // AAC metadata/headers are only reliable after AVAudioFile is closed.
+    // Unlike stop(), stopAsync() waits for both recorders and live.json.
+    await session.stopAsync()
+    NutolaConsoleLog.recording(
+      "capture finalized before processing \(meeting.id.uuidString.prefix(8))")
     return (session, meeting)
   }
 

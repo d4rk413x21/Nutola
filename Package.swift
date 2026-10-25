@@ -27,18 +27,18 @@ let package = Package(
             ],
             path: "Sources/Nutola",
             resources: [.process("Resources")],
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .executableTarget(
             name: "zoom-info",
             path: "Sources/ZoomInfo",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
             name: "NutolaTests",
             dependencies: ["Nutola"],
             path: "Tests/NutolaTests",
-            swiftSettings: [.swiftLanguageMode(.v5)]
+            swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]
 )

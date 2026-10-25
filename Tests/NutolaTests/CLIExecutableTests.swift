@@ -14,7 +14,8 @@ final class CLIExecutableTests: XCTestCase {
     #endif
 
     override func setUpWithError() throws {
-        home = FileManager.default.temporaryDirectory.appendingPathComponent("nutola cli's home \(UUID().uuidString)")
+        home = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+            .appendingPathComponent("nutola cli's home \(UUID().uuidString)")
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
     }
 

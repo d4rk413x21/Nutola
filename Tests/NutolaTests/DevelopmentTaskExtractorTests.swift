@@ -221,6 +221,33 @@ final class DevelopmentTaskExtractorTests: XCTestCase {
     }
 
     @MainActor
+    func testGrowingHistoryPagesAreRepackedBeforeTheNextProposalBatch() async throws {
+        var extracts = 0
+        var reconciliations = 0
+        let result = try await DevelopmentTaskExtractor.extract(meeting: meeting, transcript: twoParts, analyze: { instructions, input in
+            XCTAssertLessThanOrEqual(instructions.utf8.count + input.utf8.count, DevelopmentTaskExtractor.maxRequestBytes)
+            if instructions == DevelopmentTaskExtractor.prompt {
+                extracts += 1
+                let tasks = (0..<(extracts == 1 ? 4 : 3)).map { n in
+                    DevelopmentTaskExtractor.Candidate(title: "Task \(extracts)-\(n)",
+                        detail: String(repeating: "x", count: extracts == 1 ? 1_000 : 4_000), evidence: [extracts])
+                }
+                return String(decoding: try JSONEncoder().encode(["tasks": tasks]), as: UTF8.self)
+            }
+            reconciliations += 1
+            guard reconciliations == 1 else { return #"{"updates":[]}"# }
+            let updates: [[String: Any]] = (0..<4).map { n in
+                ["id": n, "task": ["title": "Task 1-\(n)", "detail": String(repeating: "y", count: 6_000),
+                                    "evidence": [2]], "merged": [], "evidence": [2]]
+            }
+            return String(decoding: try JSONSerialization.data(withJSONObject: ["updates": updates]), as: UTF8.self)
+        })
+        XCTAssertGreaterThan(reconciliations, 3)
+        XCTAssertEqual(result.tasks.count, 7)
+        XCTAssertEqual(result.tasks.first?.detail.utf8.count, 6_000)
+    }
+
+    @MainActor
     func testReconciliationRejectsUnknownIDsAndUnseenEvidence() async throws {
         for reply in [
             #"{"updates":[{"id":99,"task":null,"merged":[],"evidence":[2]}]}"#,

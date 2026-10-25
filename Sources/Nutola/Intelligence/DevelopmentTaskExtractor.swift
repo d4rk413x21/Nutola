@@ -197,35 +197,38 @@ enum DevelopmentTaskExtractor {
                 for newBatch in newBatches.isEmpty ? [[]] : newBatches {
                     let old = oldBatch.compactMap { entry in earlier[entry.id].map { Entry(id: entry.id, task: $0) } }
                     if old.isEmpty { break }
-                    let new = newBatch.filter { pending[$0.id] != nil }
-                    let input = try context + "\n\nEarlier tasks:\n" + json(old) + "\n\nNew proposals:\n" + json(new)
-                    let reply = try await request(reconciliationPrompt, input)
-                    guard let changes = try? JSONDecoder().decode(Changes.self, from: Data(reply.utf8)) else {
-                        throw DevelopmentTaskError.invalidResponse
-                    }
-                    let oldIDs = Set(old.map(\.id)), newIDs = Set(new.map(\.id))
-                    var changed: Set<Int> = [], merged: Set<Int> = []
-                    for change in changes.updates {
-                        let cited = Set(change.evidence)
-                        guard oldIDs.contains(change.id), changed.insert(change.id).inserted,
-                              !cited.isEmpty, cited.isSubset(of: evidence),
-                              Set(change.merged).count == change.merged.count,
-                              Set(change.merged).isSubset(of: newIDs),
-                              merged.isDisjoint(with: change.merged) else { throw DevelopmentTaskError.invalidEvidence }
-                        merged.formUnion(change.merged)
-                        guard var revised = change.task else {
-                            guard change.merged.isEmpty else { throw DevelopmentTaskError.invalidResponse }
-                            earlier.removeValue(forKey: change.id)
-                            continue
+                    // Earlier tasks can grow after a merge; repack before every request.
+                    for page in try batches(old) {
+                        let new = newBatch.filter { pending[$0.id] != nil }
+                        let input = try context + "\n\nEarlier tasks:\n" + json(page) + "\n\nNew proposals:\n" + json(new)
+                        let reply = try await request(reconciliationPrompt, input)
+                        guard let changes = try? JSONDecoder().decode(Changes.self, from: Data(reply.utf8)) else {
+                            throw DevelopmentTaskError.invalidResponse
                         }
-                        // Keep original source references even when the model omits them during a merge.
-                        let sources = (earlier[change.id]?.evidence ?? []) + change.merged.flatMap { pending[$0]?.evidence ?? [] }
-                        let allowed = evidence.union(sources)
-                        revised.evidence = Array(Set(revised.evidence).union(sources).union(cited)).sorted()
-                        let validated = try decode(json(Response(tasks: [revised])), transcript: transcript,
-                                                   allowedEvidence: allowed, meeting: meeting)
-                        earlier[change.id] = validated[0]
-                        for id in change.merged { pending.removeValue(forKey: id) }
+                        let oldIDs = Set(page.map(\.id)), newIDs = Set(new.map(\.id))
+                        var changed: Set<Int> = [], merged: Set<Int> = []
+                        for change in changes.updates {
+                            let cited = Set(change.evidence)
+                            guard oldIDs.contains(change.id), changed.insert(change.id).inserted,
+                                  !cited.isEmpty, cited.isSubset(of: evidence),
+                                  Set(change.merged).count == change.merged.count,
+                                  Set(change.merged).isSubset(of: newIDs),
+                                  merged.isDisjoint(with: change.merged) else { throw DevelopmentTaskError.invalidEvidence }
+                            merged.formUnion(change.merged)
+                            guard var revised = change.task else {
+                                guard change.merged.isEmpty else { throw DevelopmentTaskError.invalidResponse }
+                                earlier.removeValue(forKey: change.id)
+                                continue
+                            }
+                            // Keep original source references even when the model omits them during a merge.
+                            let sources = (earlier[change.id]?.evidence ?? []) + change.merged.flatMap { pending[$0]?.evidence ?? [] }
+                            let allowed = evidence.union(sources)
+                            revised.evidence = Array(Set(revised.evidence).union(sources).union(cited)).sorted()
+                            let validated = try decode(json(Response(tasks: [revised])), transcript: transcript,
+                                                       allowedEvidence: allowed, meeting: meeting)
+                            earlier[change.id] = validated[0]
+                            for id in change.merged { pending.removeValue(forKey: id) }
+                        }
                     }
                 }
             }

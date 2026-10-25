@@ -179,13 +179,17 @@ struct CodexCLI {
     private static func probeLoggedIn() -> Bool {
         if authFromDisk() { return true }
         guard let cli = resolveBlocking() else { return false }
+        return probeLoggedIn(executable: cli)
+    }
+
+    static func probeLoggedIn(executable cli: URL) -> Bool {
         let sh = Process()
         sh.executableURL = URL(fileURLWithPath: "/bin/zsh")
         sh.arguments = ["-lc", CLIExecutable.command(executable: cli, arguments: ["login", "status"], directory: workDir)]
         sh.standardInput = FileHandle.nullDevice
-        sh.standardError = FileHandle.nullDevice
         let out = Pipe()
         sh.standardOutput = out
+        sh.standardError = out // Codex reports successful login status on stderr.
         guard (try? sh.run()) != nil else { return false }
         let data = out.fileHandleForReading.readDataToEndOfFile()
         sh.waitUntilExit()

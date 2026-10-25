@@ -184,6 +184,7 @@ final class DevelopmentTaskExtractorTests: XCTestCase {
     }
 
     func testMarkdownIncludesOnlySelectedDraftsAndOriginalEvidence() {
+        let meeting = self.meeting
         let included = DevelopmentTaskDraft(title: "Fix login", detail: "Handle token expiry.", evidence: transcript)
         let excluded = DevelopmentTaskDraft(title: "Excluded task", detail: "Not selected", evidence: [])
         let review = DevelopmentTaskReview(tasks: [included, excluded])

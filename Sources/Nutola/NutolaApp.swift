@@ -74,6 +74,7 @@ struct MenuBarUpcomingEvent: Equatable {
     var countdown: String
 }
 
+@MainActor
 enum MenuBarTitleTruncator {
     private static let font: NSFont = {
         let base = NSFont.systemFont(ofSize: 11, weight: .semibold)

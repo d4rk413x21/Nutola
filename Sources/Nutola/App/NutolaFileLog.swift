@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// Persistent file logger. Writes every `NutolaConsoleLog` line to
 /// `~/Library/Application Support/Nutola/Logs/nutola.log` so the app's own
@@ -13,11 +14,7 @@ import Foundation
 enum NutolaFileLog {
     private static let queue = DispatchQueue(label: "io.github.d4rk413x21.Nutola.filelog")
     private static let maxRetainedFiles = 14
-    private static let dateFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
+    private static let dateFormatter = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
     private static let fileFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -36,13 +33,17 @@ enum NutolaFileLog {
         logDirectory.appendingPathComponent("nutola-\(fileFormatter.string(from: Date())).log")
     }
 
-    private static var hasPrepared = false
+    private static let hasPrepared = Mutex(false)
 
     /// Creates the log directory and prunes old files. Called once per process
     /// lifetime, on the serial queue, before the first write.
     private static func prepare() {
-        guard !hasPrepared else { return }
-        hasPrepared = true
+        let needsPreparation = hasPrepared.withLock { prepared in
+            if prepared { return false }
+            prepared = true
+            return true
+        }
+        guard needsPreparation else { return }
         try? FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true)
         prune()
     }
@@ -68,7 +69,7 @@ enum NutolaFileLog {
     /// Appends a single log line. Safe from any thread; never blocks the caller
     /// (the write is dispatched async to the serial queue).
     static func log(_ category: String, _ message: String) {
-        let stamp = dateFormatter.string(from: Date())
+        let stamp = dateFormatter.format(Date())
         let line = "\(stamp) [\(category)] \(message)\n"
         queue.async {
             prepare()

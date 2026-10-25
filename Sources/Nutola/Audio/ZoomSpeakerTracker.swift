@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import AppKit
 import ApplicationServices
 
@@ -320,127 +321,132 @@ enum ZoomActiveSpeakerReader {
     /// and returns the last `ScanResult` directly. The signature captures role,
     /// child count, and title/description of every node (bounded depth), so any
     /// speaker transition or roster change alters it and forces a fresh scan.
-    private static var lastScanSignature: Int?
-    private static var lastScanResult: ScanResult?
+    private struct ScanCache {
+        var signature: Int?
+        var result: ScanResult?
+    }
+    private static let scanCache = Mutex(ScanCache())
 
     static func scan() -> ScanResult {
-        guard AccessibilityPermission.isTrusted else {
-            lastScanSignature = nil
-            lastScanResult = nil
-            return ScanResult(
-                zoomPID: nil, roster: [], active: [], activeSource: .activeSpeaker,
-                latestCaption: nil, localParticipantMuted: nil)
-        }
-        guard let app = NSWorkspace.shared.runningApplications.first(where: {
-            $0.bundleIdentifier == mainBundleID
-        }) else {
-            lastScanSignature = nil
-            lastScanResult = nil
-            return ScanResult(
-                zoomPID: nil, roster: [], active: [], activeSource: .activeSpeaker,
-                latestCaption: nil, localParticipantMuted: nil)
-        }
-
-        let root = AXUIElementCreateApplication(app.processIdentifier)
-        // Build the entry-point windows the same way the full scan would, then
-        // hash their subtree shape. A matching signature means the tree is
-        // unchanged since the last poll → return the cached result and skip the
-        // expensive walk + per-node regex parsing.
-        var scannedWindows = allWindows(root)
-        if scannedWindows.isEmpty {
-            if let focused = focusedWindow(root) {
-                scannedWindows = [focused]
+        scanCache.withLock { cache in
+            guard AccessibilityPermission.isTrusted else {
+                cache.signature = nil
+                cache.result = nil
+                return ScanResult(
+                    zoomPID: nil, roster: [], active: [], activeSource: .activeSpeaker,
+                    latestCaption: nil, localParticipantMuted: nil)
             }
-        }
-        // No window accessible at all — Zoom is on another Space, minimized, or
-        // its window is mid-redraw. Walking root yields only the menu bar (an
-        // empty roster), and caching that would blank the UI on every transient
-        // AX failure. Instead, keep the last known non-empty result so the
-        // roster and active-speaker timeline stay stable until the window
-        // reappears. If there's no prior result, fall through to the root walk
-        // so the first scan still runs (and logs/dumps for diagnosis).
-        if scannedWindows.isEmpty, let cached = lastScanResult, !cached.roster.isEmpty {
-            return cached
-        }
-        let signature = treeSignature(of: scannedWindows, fallback: root)
-        // Bypass the cache when we have participants but no active speaker.
-        // The signature hashes role/title/description/childCount — NOT AXValue
-        // or AXSelected. If Zoom indicates the active speaker via a mechanism
-        // other than the tile description (AXValue, a child element, visual
-        // highlight), the signature stays stable across speaker transitions and
-        // the cache would return the same empty-active result forever. Forcing
-        // a fresh walk every tick ensures any new parser logic actually runs.
-        if signature == lastScanSignature, let cached = lastScanResult,
-           !(cached.active.isEmpty && !cached.roster.isEmpty) {
-            return cached
-        }
+            guard let app = NSWorkspace.shared.runningApplications.first(where: {
+                $0.bundleIdentifier == mainBundleID
+            }) else {
+                cache.signature = nil
+                cache.result = nil
+                return ScanResult(
+                    zoomPID: nil, roster: [], active: [], activeSource: .activeSpeaker,
+                    latestCaption: nil, localParticipantMuted: nil)
+            }
 
-        var roster: [String] = []
+            let root = AXUIElementCreateApplication(app.processIdentifier)
+            // Build the entry-point windows the same way the full scan would, then
+            // hash their subtree shape. A matching signature means the tree is
+            // unchanged since the last poll → return the cached result and skip the
+            // expensive walk + per-node regex parsing.
+            var scannedWindows = allWindows(root)
+            if scannedWindows.isEmpty {
+                if let focused = focusedWindow(root) {
+                    scannedWindows = [focused]
+                }
+            }
+            // No window accessible at all — Zoom is on another Space, minimized, or
+            // its window is mid-redraw. Walking root yields only the menu bar (an
+            // empty roster), and caching that would blank the UI on every transient
+            // AX failure. Instead, keep the last known non-empty result so the
+            // roster and active-speaker timeline stay stable until the window
+            // reappears. If there's no prior result, fall through to the root walk
+            // so the first scan still runs (and logs/dumps for diagnosis).
+            if scannedWindows.isEmpty, let cached = cache.result, !cached.roster.isEmpty {
+                return cached
+            }
+            let signature = treeSignature(of: scannedWindows, fallback: root)
+            // Bypass the cache when we have participants but no active speaker.
+            // The signature hashes role/title/description/childCount — NOT AXValue
+            // or AXSelected. If Zoom indicates the active speaker via a mechanism
+            // other than the tile description (AXValue, a child element, visual
+            // highlight), the signature stays stable across speaker transitions and
+            // the cache would return the same empty-active result forever. Forcing
+            // a fresh walk every tick ensures any new parser logic actually runs.
+            if signature == cache.signature, let cached = cache.result,
+               !(cached.active.isEmpty && !cached.roster.isEmpty) {
+                return cached
+            }
 
-        var activeTiles: [String] = []
-        var activeLabels: [String] = []
-        var selectedTiles: [String] = []
-        var latestCaption: CaptionLine?
-        var localMuted: Bool?
-        // Strategy: try multiple AX entry points to find participant tiles.
-        // 1. kAXWindowsAttribute — all windows (works when on the active Space).
-        // 2. kAXFocusedWindowAttribute — the focused window (works even when on
-        //    another Space — kAXWindowsAttribute returns 0 for inactive Spaces,
-        //    but the focused window is still accessible with its full subtree).
-        // 3. kAXChildrenAttribute on root — last resort (usually just the menu bar).
-        if scannedWindows.isEmpty {
-            walk(
-                root, depth: 0, roster: &roster,
-                activeTiles: &activeTiles, activeLabels: &activeLabels,
-                selectedTiles: &selectedTiles, latestCaption: &latestCaption,
-                localMuted: &localMuted)
-        } else {
-            for window in scannedWindows {
+            var roster: [String] = []
+
+            var activeTiles: [String] = []
+            var activeLabels: [String] = []
+            var selectedTiles: [String] = []
+            var latestCaption: CaptionLine?
+            var localMuted: Bool?
+            // Strategy: try multiple AX entry points to find participant tiles.
+            // 1. kAXWindowsAttribute — all windows (works when on the active Space).
+            // 2. kAXFocusedWindowAttribute — the focused window (works even when on
+            //    another Space — kAXWindowsAttribute returns 0 for inactive Spaces,
+            //    but the focused window is still accessible with its full subtree).
+            // 3. kAXChildrenAttribute on root — last resort (usually just the menu bar).
+            if scannedWindows.isEmpty {
                 walk(
-                    window, depth: 0, roster: &roster,
+                    root, depth: 0, roster: &roster,
                     activeTiles: &activeTiles, activeLabels: &activeLabels,
                     selectedTiles: &selectedTiles, latestCaption: &latestCaption,
                     localMuted: &localMuted)
+            } else {
+                for window in scannedWindows {
+                    walk(
+                        window, depth: 0, roster: &roster,
+                        activeTiles: &activeTiles, activeLabels: &activeLabels,
+                        selectedTiles: &selectedTiles, latestCaption: &latestCaption,
+                        localMuted: &localMuted)
+                }
             }
-        }
-        let rosterOut = deduped(roster)
-        // Gallery tiles list every unmuted participant; only trust explicit
-        // "active speaker" markers on those tiles. Legacy labels (participants
-        // panel, notifications) are a fallback when no tile is marked.
-        let (activeOut, source): ([String], PlatformSpeakerSource)
-        if !activeTiles.isEmpty {
-            activeOut = activeTiles
-            source = .activeSpeaker
-        } else if !activeLabels.isEmpty {
-            activeOut = activeLabels
-            source = .activeSpeaker
-        } else {
-            activeOut = selectedTiles
-            source = .selectedTile
-        }
-        // Validate the caption against the roster when we have one: Zoom's
-        // live-transcript lines name actual participants, so a parsed "name"
-        // that isn't close to anyone on the roster is a false positive — usually
-        // a window title or tab label that happened to contain a colon. When
-        // the roster is empty (meeting just started, or AX couldn't read tiles),
-        // fall back to a name-shape heuristic so junk like "Backend Monorepo
-        // DevX" doesn't sneak in as a speaker.
-        let validatedCaption = latestCaption.flatMap { caption -> CaptionLine? in
-            if !rosterOut.isEmpty {
-                return nameMatchesRoster(caption.name, rosterOut) ? caption : nil
+            let rosterOut = deduped(roster)
+            // Gallery tiles list every unmuted participant; only trust explicit
+            // "active speaker" markers on those tiles. Legacy labels (participants
+            // panel, notifications) are a fallback when no tile is marked.
+            let (activeOut, source): ([String], PlatformSpeakerSource)
+            if !activeTiles.isEmpty {
+                activeOut = activeTiles
+                source = .activeSpeaker
+            } else if !activeLabels.isEmpty {
+                activeOut = activeLabels
+                source = .activeSpeaker
+            } else {
+                activeOut = selectedTiles
+                source = .selectedTile
             }
-            return looksLikePersonName(caption.name) ? caption : nil
+            // Validate the caption against the roster when we have one: Zoom's
+            // live-transcript lines name actual participants, so a parsed "name"
+            // that isn't close to anyone on the roster is a false positive — usually
+            // a window title or tab label that happened to contain a colon. When
+            // the roster is empty (meeting just started, or AX couldn't read tiles),
+            // fall back to a name-shape heuristic so junk like "Backend Monorepo
+            // DevX" doesn't sneak in as a speaker.
+            let validatedCaption = latestCaption.flatMap { caption -> CaptionLine? in
+                if !rosterOut.isEmpty {
+                    return nameMatchesRoster(caption.name, rosterOut) ? caption : nil
+                }
+                return looksLikePersonName(caption.name) ? caption : nil
+            }
+            let result = ScanResult(
+                zoomPID: app.processIdentifier,
+                roster: rosterOut,
+                active: deduped(activeOut).filter { !isLocalParticipant($0) },
+                activeSource: source,
+                latestCaption: validatedCaption,
+                localParticipantMuted: localMuted)
+            cache.signature = signature
+            cache.result = result
+            return result
         }
-        let result = ScanResult(
-            zoomPID: app.processIdentifier,
-            roster: rosterOut,
-            active: deduped(activeOut).filter { !isLocalParticipant($0) },
-            activeSource: source,
-            latestCaption: validatedCaption,
-            localParticipantMuted: localMuted)
-        lastScanSignature = signature
-        lastScanResult = result
-        return result
     }
 
     /// Cheap structural fingerprint of the Zoom AX subtree rooted at `windows`

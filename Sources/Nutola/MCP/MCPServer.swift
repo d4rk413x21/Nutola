@@ -86,7 +86,7 @@ final class MCPServer {
 
     // MARK: - Tools
 
-    static let toolDefinitions: [[String: Any]] = [
+    static var toolDefinitions: [[String: Any]] { [
         [
             "name": "list_meetings",
             "description": "List recent meetings (id, title, date, duration, attendees). Newest first. Supports `limit` and `offset` for pagination; when more meetings exist beyond the page, a `next_offset` hint is appended to the text.",
@@ -246,7 +246,7 @@ final class MCPServer {
                 "required": ["old_name", "new_name"],
             ] as [String: Any],
         ],
-    ]
+    ] }
 
     enum ToolError: LocalizedError {
         case unknownTool(String)

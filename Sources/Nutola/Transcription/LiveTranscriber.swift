@@ -33,13 +33,13 @@ final class LiveTranscriber: @unchecked Sendable {
 
   /// Display name for the local speaker ("You"), overridden with the Zoom
   /// roster's local participant name or NSFullUserName when available.
-  static var localSpeakerName: String = "You"
+  @MainActor static var localSpeakerName: String = "You"
 
   /// Display name for the remote speaker ("Others"), overridden with the
   /// single remote Zoom participant when the roster has exactly one non-local name.
-  static var remoteSpeakerName: String = "Others"
+  @MainActor static var remoteSpeakerName: String = "Others"
 
-  static func name(for speakerID: String) -> String {
+  @MainActor static func name(for speakerID: String) -> String {
     switch speakerID {
     case youSpeakerID: return localSpeakerName
     case othersSpeakerID: return remoteSpeakerName

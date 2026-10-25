@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 enum RelativeTimeFormatter {
     /// "in 52m" for any future start — used in the menu "Starts in …" header.
@@ -50,17 +51,17 @@ enum RelativeTimeFormatter {
     /// hand-rolled because the menu-bar slot needs the tight "52m"/"2h 15m"
     /// shape their tests pin down, which `RelativeDateTimeFormatter` doesn't
     /// reproduce — those remain the custom edge cases.
-    private static let naturalFormatter: RelativeDateTimeFormatter = {
+    private static let naturalFormatter = Mutex<RelativeDateTimeFormatter>({
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .abbreviated
         return f
-    }()
+    }())
 
     /// "in 52 min" / "2 hr ago" — localized relative time for a past or future
     /// date. `RelativeDateTimeFormatter` returns "" when `date == now`, so callers
     /// wanting a guaranteed non-empty value should treat "" as "just now".
     static func naturalRelative(to date: Date, now: Date = .now) -> String {
-        naturalFormatter.localizedString(for: date, relativeTo: now)
+        naturalFormatter.withLock { $0.localizedString(for: date, relativeTo: now) }
     }
 }
 

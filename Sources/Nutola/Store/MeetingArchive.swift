@@ -24,17 +24,13 @@ final class MeetingArchive: @unchecked Sendable {
 
     private let queue = DispatchQueue(label: "io.github.d4rk413x21.Nutola.archive")
     // ISO8601 with fractional seconds so Dates round-trip losslessly enough for Equatable.
-    private static let dateFormatter: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
+    private static let dateFormatter = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.outputFormatting = [.prettyPrinted, .sortedKeys]
         e.dateEncodingStrategy = .custom { date, enc in
             var c = enc.singleValueContainer()
-            try c.encode(MeetingArchive.dateFormatter.string(from: date))
+            try c.encode(MeetingArchive.dateFormatter.format(date))
         }
         return e
     }()
@@ -42,8 +38,8 @@ final class MeetingArchive: @unchecked Sendable {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { dec in
             let s = try dec.singleValueContainer().decode(String.self)
-            guard let date = MeetingArchive.dateFormatter.date(from: s)
-                ?? ISO8601DateFormatter().date(from: s)
+            guard let date = (try? MeetingArchive.dateFormatter.parse(s))
+                ?? (try? Date.ISO8601FormatStyle().parse(s))
             else {
                 throw DecodingError.dataCorrupted(.init(
                     codingPath: dec.codingPath, debugDescription: "Bad date: \(s)"))

@@ -327,6 +327,7 @@ struct MenuBarView: View {
 /// SwiftUI's MenuBarExtra(.window) has no dismiss API — capture the panel and
 /// order it out. As a fallback, also try clicking the status bar item to
 /// toggle the panel closed.
+@MainActor
 private enum MenuBarExtraPanel {
     private static weak var window: NSWindow?
 

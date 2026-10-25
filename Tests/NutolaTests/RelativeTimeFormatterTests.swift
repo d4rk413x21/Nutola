@@ -9,6 +9,23 @@ import XCTest
 /// pin *behavior* (non-empty for non-now, empty/space-only for now, sign
 /// direction via prefix words) rather than exact localized strings.
 final class RelativeTimeFormatterTests: XCTestCase {
+    @MainActor
+    func testNaturalRelativeFormattingCanBeUsedConcurrently() async {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let date = now.addingTimeInterval(-3_600)
+        let expected = RelativeTimeFormatter.naturalRelative(to: date, now: now)
+        let values = await withTaskGroup(of: String.self) { group in
+            for _ in 0..<64 {
+                group.addTask { RelativeTimeFormatter.naturalRelative(to: date, now: now) }
+            }
+            var values: [String] = []
+            for await value in group { values.append(value) }
+            return values
+        }
+        XCTAssertEqual(values.count, 64)
+        XCTAssertEqual(Set(values), [expected])
+    }
+
     private func natural(_ date: Date, now: Date) -> String {
         RelativeTimeFormatter.naturalRelative(to: date, now: now)
     }

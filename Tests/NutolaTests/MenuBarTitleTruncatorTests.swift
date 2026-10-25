@@ -13,6 +13,7 @@ import XCTest
 ///   - short titles pass through unchanged (suffix still appended)
 ///   - the title budget never collapses to zero (clamped to a minimum), so a
 ///     very long countdown can't starve the title to an empty string
+@MainActor
 final class MenuBarTitleTruncatorTests: XCTestCase {
     private func label(title: String, countdown: String) -> String {
         MenuBarTitleTruncator.label(for: MenuBarUpcomingEvent(title: title, countdown: countdown))

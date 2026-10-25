@@ -1,6 +1,7 @@
 import AppKit
 import CoreFoundation
 import Foundation
+import Synchronization
 
 /// System Audio Recording (kTCCServiceAudioCapture). macOS has no public preflight/request
 /// API; TCCAccessRequest via the TCC framework is the reliable way to surface the consent
@@ -76,21 +77,19 @@ enum SystemAudioPermission {
     private typealias PreflightFunc = @convention(c) (CFString, CFDictionary?) -> Int
     private typealias RequestFunc = @convention(c) (CFString, CFDictionary?, @escaping (Bool) -> Void) -> Void
 
-    private static let apiHandle: UnsafeMutableRawPointer? = {
-        dlopen("/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC", RTLD_NOW)
-    }()
+    private static let apiHandle = Mutex(dlopen("/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC", RTLD_NOW))
 
-    private static let preflightSPI: PreflightFunc? = {
-        guard let apiHandle,
+    private static let preflightSPI: PreflightFunc? = apiHandle.withLock { handle in
+        guard let apiHandle = handle,
               let sym = dlsym(apiHandle, "TCCAccessPreflight")
         else { return nil }
         return unsafeBitCast(sym, to: PreflightFunc.self)
-    }()
+    }
 
-    private static let requestSPI: RequestFunc? = {
-        guard let apiHandle,
+    private static let requestSPI: RequestFunc? = apiHandle.withLock { handle in
+        guard let apiHandle = handle,
               let sym = dlsym(apiHandle, "TCCAccessRequest")
         else { return nil }
         return unsafeBitCast(sym, to: RequestFunc.self)
-    }()
+    }
 }

@@ -45,6 +45,20 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(archive.allMeetings(), [m])
     }
 
+    func testReadsExistingISODatesWithAndWithoutFractionalSeconds() throws {
+        let meeting = makeMeeting()
+        try archive.save(meeting)
+        let file = archive.folder(for: meeting.id).appendingPathComponent("meeting.json")
+        var data = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        for (text, expected) in [("2023-11-14T22:13:20.123Z", 1_700_000_000.123),
+                                 ("2023-11-14T22:13:20Z", 1_700_000_000.0)] {
+            data["createdAt"] = text
+            try JSONSerialization.data(withJSONObject: data).write(to: file)
+            let loaded = try XCTUnwrap(archive.meeting(id: meeting.id))
+            XCTAssertEqual(loaded.createdAt.timeIntervalSince1970, expected, accuracy: 0.001)
+        }
+    }
+
     func testTranscriptRoundTrip() throws {
         let m = makeMeeting()
         try archive.save(m)

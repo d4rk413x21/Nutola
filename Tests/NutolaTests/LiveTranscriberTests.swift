@@ -1,6 +1,7 @@
 import XCTest
 @testable import Nutola
 
+@MainActor
 final class LiveTranscriberTests: XCTestCase {
     func testTurnsGroupConsecutiveSameSpeaker() {
         let segments = [

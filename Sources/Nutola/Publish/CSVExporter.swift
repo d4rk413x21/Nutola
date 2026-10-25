@@ -42,7 +42,7 @@ enum CSVExporter {
 
     /// ISO 8601 date — sortable and unambiguous in a spreadsheet.
     private static func dateString(_ date: Date) -> String {
-        Self.dateFormatter.string(from: date)
+        date.formatted(.iso8601)
     }
 
     /// Speakers as semicolon-joined display names, preserving stored order.
@@ -60,9 +60,4 @@ enum CSVExporter {
         return "\"\(doubled)\""
     }
 
-    private static let dateFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
 }

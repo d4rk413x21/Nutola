@@ -71,6 +71,20 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(archive.meeting(id: meeting.id), meeting)
     }
 
+    func testStaleDevelopmentDraftWritesCannotEraseLinearCheckpoints() throws {
+        let meeting = makeMeeting()
+        try archive.save(meeting)
+        let draft = DevelopmentTaskDraft(title: "Fix login", detail: "Handle expired tokens.", evidence: [])
+        let original = DevelopmentTaskReview(tasks: [draft])
+        try archive.saveDevelopmentTasks(original, for: meeting.id, replacing: DevelopmentTaskReview())
+        var linked = original
+        linked.tasks[0].linearExport = LinearIssueExport(id: draft.id, workspaceID: "workspace", teamID: "team",
+            identifier: "DEV-12", url: URL(string: "https://linear.app/work/issue/DEV-12/task")!)
+        try archive.saveDevelopmentTasks(linked, for: meeting.id, replacing: original)
+        XCTAssertThrowsError(try archive.saveDevelopmentTasks(original, for: meeting.id, replacing: original))
+        XCTAssertEqual(try archive.developmentTasks(for: meeting.id), linked)
+    }
+
     func testDevelopmentDraftsCannotResurrectDeletedMeetings() throws {
         let meeting = makeMeeting()
         try archive.save(meeting)

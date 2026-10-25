@@ -208,13 +208,20 @@ final class MeetingArchive: @unchecked Sendable {
         }
     }
 
-    func saveDevelopmentTasks(_ review: DevelopmentTaskReview, for id: UUID) throws {
+    func saveDevelopmentTasks(
+        _ review: DevelopmentTaskReview, for id: UUID, replacing expected: DevelopmentTaskReview? = nil
+    ) throws {
         try queue.sync {
             guard FileManager.default.fileExists(atPath: folder(for: id).appendingPathComponent("meeting.json").path) else {
                 throw ArchiveError.meetingDeleted
             }
-            try encoder.encode(review).write(
-                to: folder(for: id).appendingPathComponent("development-tasks.json"), options: .atomic)
+            let file = folder(for: id).appendingPathComponent("development-tasks.json")
+            if let expected {
+                let current = FileManager.default.fileExists(atPath: file.path)
+                    ? try decoder.decode(DevelopmentTaskReview.self, from: Data(contentsOf: file)) : DevelopmentTaskReview()
+                guard current == expected else { throw DevelopmentTaskError.draftsChanged }
+            }
+            try encoder.encode(review).write(to: file, options: .atomic)
         }
     }
 

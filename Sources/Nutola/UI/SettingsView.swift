@@ -16,6 +16,8 @@ struct SettingsView: View {
                 .tabItem { Label("Transcription", systemImage: "waveform") }
             TemplateSettings()
                 .tabItem { Label("Templates", systemImage: "doc.text") }
+            LinearSettings()
+                .tabItem { Label("Integrations", systemImage: "link") }
             CalendarSettings()
                 .tabItem { Label("Calendar", systemImage: "calendar") }
             AppearanceSettings()

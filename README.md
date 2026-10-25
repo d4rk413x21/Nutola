@@ -231,8 +231,21 @@ unassigned.
 Drafts are saved alongside the meeting in `development-tasks.json`. Re-extracting asks before
 replacing edits; failures and cancellation keep existing drafts. A warning appears if the
 transcript has changed since extraction. Select drafts and use **Copy selected drafts** to
-copy their descriptions and evidence for use in Linear. This workflow prepares local drafts;
-it does not create Linear issues.
+copy their descriptions and evidence.
+
+To create issues directly, open **Settings → Integrations**, connect a Linear personal API key,
+then choose a **Team** and optional **Project** in Development tasks. The key is stored in the
+macOS login Keychain and needs read access to teams, projects and issues, plus permission to
+create issues. Only selected draft descriptions and their quoted source passages are sent to
+Linear. Owner names remain in the description; Nutola does not guess Linear assignees.
+
+**Create / retry issues** saves a checkpoint before each request and records every returned
+issue link immediately. Retry checks for the same stable issue UUID first, including archived
+issues, so timeouts and partially completed batches can recover existing issues. If an issue
+already exists, retry recovers its link without applying further draft edits. Created issues
+are edited in Linear. Drafts with pending or completed exports cannot be removed or replaced
+by re-extraction, keeping retry IDs and links intact. Disconnecting removes the API key while
+retaining created issues and local links. Concurrent stale draft saves are rejected.
 
 Extraction sends the transcript through the selected CLI account. Claude runs without tools;
 Codex uses an isolated read-only invocation without user configuration, connectors, or shell

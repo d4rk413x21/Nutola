@@ -18,6 +18,23 @@ struct DevelopmentTasksSheet: View {
     @State private var loadFailed = false
     @State private var confirmReplace = false
 
+    @State private var isPublishing = false
+    @State private var publication: Task<Void, Never>?
+    @State private var linearClient: LinearClient?
+    @State private var workspace: LinearWorkspace?
+    @State private var teams: [LinearTeam] = []
+    @State private var projects: [LinearProject] = []
+    @State private var teamID = ""
+    @State private var projectID = ""
+    @State private var loadingLinear = false
+    @State private var loadingProjects = false
+    @State private var showLinearSettings = false
+
+    private var busy: Bool { isExtracting || isPublishing }
+    private var hasExports: Bool { review.tasks.contains { $0.linearExport != nil } }
+    private var publishCount: Int {
+        review.tasks.filter { selectedIDs.contains($0.id) && $0.linearExport?.url == nil }.count
+    }
     private var hasChanges: Bool { review != savedReview }
     private var isStale: Bool {
         !review.transcriptFingerprint.isEmpty && review.transcriptFingerprint != currentFingerprint
@@ -34,7 +51,7 @@ struct DevelopmentTasksSheet: View {
                 Button("Save & Close") {
                     if save() { dismiss() }
                 }
-                .disabled(isExtracting || loadFailed)
+                .disabled(busy || loadFailed)
                 .keyboardShortcut(.defaultAction)
                 if loadFailed {
                     Button("Close") { dismiss() }
@@ -48,7 +65,7 @@ struct DevelopmentTasksSheet: View {
                     }
                 }
                 .frame(width: 240)
-                .disabled(isExtracting)
+                .disabled(busy)
                 if isExtracting {
                     ProgressView().controlSize(.small)
                     Text(progress).font(.callout)
@@ -61,10 +78,10 @@ struct DevelopmentTasksSheet: View {
                             confirmReplace = true
                         }
                     }
-                    .disabled(loadFailed || currentFingerprint.isEmpty)
+                    .disabled(busy || hasExports || loadFailed || currentFingerprint.isEmpty)
                 }
             }
-            Text("The saved transcript is sent through your signed-in CLI. Review the drafts before using them in Linear.")
+            Text("The saved transcript is sent through your signed-in CLI. Review the drafts before creating issues in Linear.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
@@ -77,6 +94,7 @@ struct DevelopmentTasksSheet: View {
             }
 
             Divider()
+            linearControls
             ScrollView {
                 if review.tasks.isEmpty {
                     Text(review.transcriptFingerprint.isEmpty
@@ -91,7 +109,7 @@ struct DevelopmentTasksSheet: View {
                         }
                     }
                     .padding(2)
-                    .disabled(isExtracting || loadFailed)
+                    .disabled(busy || loadFailed)
                 }
             }
             HStack {
@@ -103,18 +121,134 @@ struct DevelopmentTasksSheet: View {
                     NSPasteboard.general.setString(
                         review.markdown(meeting: meeting, selectedIDs: selectedIDs), forType: .string)
                 }
-                .disabled(selectedIDs.isEmpty || isExtracting || loadFailed)
+                .disabled(selectedIDs.isEmpty || busy || loadFailed)
             }
         }
         .padding(24)
         .frame(width: 760, height: 680)
-        .interactiveDismissDisabled(isExtracting || hasChanges)
-        .task { load() }
-        .onDisappear { extraction?.cancel() }
+        .interactiveDismissDisabled(busy || hasChanges)
+        .task { load(); await loadLinear() }
+        .task(id: teamID) { await loadProjects() }
+        .onReceive(NotificationCenter.default.publisher(for: LinearCredentials.changed)) { _ in
+            linearClient = nil
+            workspace = nil
+            Task { await loadLinear() }
+        }
+        .onChange(of: teamID) { projectID = ""; projects = [] }
+        .onDisappear { extraction?.cancel(); publication?.cancel() }
+        .sheet(isPresented: $showLinearSettings, onDismiss: { Task { await loadLinear() } }) {
+            VStack {
+                LinearSettings()
+                Button("Done") { showLinearSettings = false }.padding(.bottom)
+            }
+            .frame(width: 520, height: 440)
+        }
         .confirmationDialog("Replace the saved drafts and any edits?", isPresented: $confirmReplace) {
             Button("Replace drafts", role: .destructive) { extract() }
         } message: {
             Text("Existing drafts stay unchanged if analysis fails or is stopped.")
+        }
+    }
+
+    private var linearControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(workspace.map { "Linear · \($0.name)" } ?? "Linear").font(.headline)
+                Spacer()
+                if loadingLinear || isPublishing { ProgressView().controlSize(.small) }
+                Button("Configure Linear") { showLinearSettings = true }.disabled(busy || loadingLinear)
+                Button("Refresh teams") { Task { await loadLinear() } }.disabled(busy || loadingLinear)
+            }
+            if workspace != nil {
+                HStack {
+                    Picker("Team", selection: $teamID) {
+                        Text("Choose a team").tag("")
+                        ForEach(teams) { Text("\($0.key) · \($0.name)").tag($0.id) }
+                    }
+                    Picker("Project", selection: $projectID) {
+                        Text("No project").tag("")
+                        ForEach(projects) { Text($0.name).tag($0.id) }
+                    }
+                    .disabled(teamID.isEmpty || loadingProjects)
+                    if loadingProjects { ProgressView().controlSize(.small) }
+                    Button("Create / retry \(publishCount) issues") { publish() }
+                        .disabled(publishCount == 0 || teamID.isEmpty || loadingLinear || loadingProjects || isStale || loadFailed)
+                }
+                .disabled(busy)
+                Text("Only selected drafts and quoted passages are sent. Names remain in the description; assignments are managed in Linear.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Connect a personal API key in Configure Linear or Settings → Integrations.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if hasExports {
+                Text("Linked and pending tasks are retained. Edit created issues in Linear; extracting again is disabled.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @MainActor
+    private func loadLinear() async {
+        guard !busy, !loadingLinear else { return }
+        loadingLinear = true
+        linearClient = nil
+        workspace = nil
+        teams = []
+        teamID = ""
+        projects = []
+        projectID = ""
+        defer { loadingLinear = false }
+        do {
+            guard let key = try LinearCredentials.load() else { return }
+            let client = try LinearClient(apiKey: key)
+            let result = try await client.teams()
+            guard !Task.isCancelled, try LinearCredentials.load() == key else { return }
+            linearClient = client
+            workspace = result.workspace
+            teams = result.teams
+            if let pending = review.tasks.compactMap(\.linearExport).first(where: { $0.url == nil && $0.workspaceID == result.workspace.id }),
+               teams.contains(where: { $0.id == pending.teamID }) {
+                teamID = pending.teamID
+            }
+        } catch { if !Task.isCancelled { self.error = error.localizedDescription } }
+    }
+
+    @MainActor
+    private func loadProjects() async {
+        let requestedTeam = teamID
+        guard !requestedTeam.isEmpty, let client = linearClient else { loadingProjects = false; return }
+        loadingProjects = true
+        defer { if teamID == requestedTeam { loadingProjects = false } }
+        do {
+            let result = try await client.projects(teamID: requestedTeam)
+            guard !Task.isCancelled, teamID == requestedTeam else { return }
+            projects = result
+            if let pending = review.tasks.compactMap(\.linearExport).first(where: { $0.url == nil && $0.teamID == requestedTeam }),
+               let id = pending.projectID, result.contains(where: { $0.id == id }) { projectID = id }
+        } catch { if !Task.isCancelled, teamID == requestedTeam { self.error = error.localizedDescription } }
+    }
+
+    private func publish() {
+        guard !busy, !isStale, !loadingProjects, let client = linearClient, let workspace,
+              teams.contains(where: { $0.id == teamID }),
+              projectID.isEmpty || projects.contains(where: { $0.id == projectID }), save() else { return }
+        let snapshot = review
+        let selected = selectedIDs
+        let targetTeam = teamID
+        let targetProject = projectID.isEmpty ? nil : projectID
+        isPublishing = true
+        error = nil
+        publication = Task { @MainActor in
+            defer { isPublishing = false; publication = nil }
+            do {
+                _ = try await LinearTaskPublisher.publish(
+                    review: snapshot, selectedIDs: selected, meeting: meeting,
+                    workspaceID: workspace.id, teamID: targetTeam, projectID: targetProject, client: client,
+                    save: { next, previous in
+                        try app.store.archive.saveDevelopmentTasks(next, for: meeting.id, replacing: previous)
+                    }, onProgress: { next in review = next; savedReview = next })
+            } catch { self.error = error.localizedDescription }
         }
     }
 
@@ -131,20 +265,34 @@ struct DevelopmentTasksSheet: View {
                     selectedIDs.remove(id)
                     review.tasks.removeAll { $0.id == id }
                 }
+                .disabled(draft.wrappedValue.linearExport != nil)
+            }
+            if let exported = draft.wrappedValue.linearExport {
+                if let url = exported.url {
+                    Link(exported.identifier ?? "Open in Linear", destination: url)
+                } else {
+                    Label("Creation pending — retry to check Linear before creating again.", systemImage: "arrow.clockwise")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Text("If the issue already exists, retry recovers its link without applying further draft edits.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             TextField("Task title", text: draft.title)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityLabel("Task title")
+                .disabled(draft.wrappedValue.linearExport?.url != nil)
             TextEditor(text: draft.detail)
                 .font(.body)
                 .frame(minHeight: 130)
                 .border(.quaternary)
                 .accessibilityLabel("Task description")
+                .disabled(draft.wrappedValue.linearExport?.url != nil)
             TextField("Owner (leave empty if unassigned)", text: Binding(
                 get: { draft.wrappedValue.owner ?? "" },
                 set: { draft.wrappedValue.owner = $0.isEmpty ? nil : $0 }))
                 .textFieldStyle(.roundedBorder)
                 .accessibilityLabel("Task owner")
+                .disabled(draft.wrappedValue.linearExport?.url != nil)
             DisclosureGroup("Transcript evidence") {
                 ForEach(draft.wrappedValue.evidence) { segment in
                     VStack(alignment: .leading, spacing: 4) {
@@ -169,7 +317,7 @@ struct DevelopmentTasksSheet: View {
             if let saved = try app.store.archive.developmentTasks(for: meeting.id) {
                 review = saved
                 savedReview = saved
-                selectedIDs = Set(saved.tasks.map(\.id))
+                selectedIDs = Set(saved.tasks.filter { $0.linearExport?.url == nil }.map(\.id))
             }
             let transcript = app.store.transcript(for: meeting.id)
             currentFingerprint = transcript.isEmpty ? "" : try DevelopmentTaskReview.fingerprint(transcript)
@@ -191,7 +339,7 @@ struct DevelopmentTasksSheet: View {
             return false
         }
         do {
-            try app.store.archive.saveDevelopmentTasks(review, for: meeting.id)
+            try app.store.archive.saveDevelopmentTasks(review, for: meeting.id, replacing: savedReview)
             savedReview = review
             error = nil
             return true
@@ -202,6 +350,8 @@ struct DevelopmentTasksSheet: View {
     }
 
     private func extract() {
+        guard !hasExports, !busy else { return }
+        let expectedReview = savedReview
         let provider = self.provider
         let transcript = app.store.transcript(for: meeting.id)
         let state = app.store.meeting(id: meeting.id)?.state
@@ -225,7 +375,7 @@ struct DevelopmentTasksSheet: View {
                 guard try DevelopmentTaskReview.fingerprint(latest) == result.transcriptFingerprint else {
                     throw DevelopmentTaskError.transcriptChanged
                 }
-                try app.store.archive.saveDevelopmentTasks(result, for: meeting.id)
+                try app.store.archive.saveDevelopmentTasks(result, for: meeting.id, replacing: expectedReview)
                 review = result
                 savedReview = result
                 currentFingerprint = result.transcriptFingerprint

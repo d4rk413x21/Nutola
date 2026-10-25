@@ -7,6 +7,7 @@ struct DevelopmentTaskDraft: Codable, Identifiable, Equatable, Sendable {
     var detail: String
     var owner: String?
     var evidence: [TranscriptSegment]
+    var linearExport: LinearIssueExport?
 }
 
 struct DevelopmentTaskReview: Codable, Equatable, Sendable {
@@ -48,6 +49,7 @@ enum DevelopmentTaskError: LocalizedError {
     case invalidResponse
     case invalidEvidence
     case transcriptChanged
+    case draftsChanged
 
     var errorDescription: String? {
         switch self {
@@ -56,6 +58,7 @@ enum DevelopmentTaskError: LocalizedError {
         case .invalidResponse: "The assistant did not return valid task drafts. Your saved drafts have not changed."
         case .invalidEvidence: "A draft cited missing transcript passages or an unsupported owner. Your saved drafts have not changed."
         case .transcriptChanged: "The transcript changed during analysis. Extract again from the updated transcript."
+        case .draftsChanged: "These drafts changed in another window. Close and reopen Development tasks before continuing."
         }
     }
 }

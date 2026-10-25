@@ -456,9 +456,8 @@ final class AppState: NSObject, ObservableObject {
       prepared.append(m)
     }
     // Run the (minutes-long) pipeline with bounded concurrency instead of
-    // launching a Task per orphan. A TaskGroup drains its children as they
-    // finish, but it runs all of them at once — so we throttle by handing the
-    // group at most `orphanFinalizeConcurrency` orphans per wave, awaiting the
+    // launching a Task per orphan. Start at most
+    // `orphanFinalizeConcurrency` orphans per wave, awaiting the
     // wave, then refilling. Each orphan keeps its own Task in
     // `orphanProcessTasks` so `cancelOrphanProcessing` can still cancel it
     // individually (e.g. when the user resumes that meeting).
@@ -467,18 +466,14 @@ final class AppState: NSObject, ObservableObject {
       while index < prepared.count {
         let wave = prepared[index..<min(index + Self.orphanFinalizeConcurrency, prepared.count)]
         index += wave.count
-        await withTaskGroup(of: Void.self) { group in
-          for m in wave {
-            let task = Task { await process(m) }
-            orphanProcessTasks[m.id] = task
-            group.addTask { @MainActor in
-              await task.value
-              self.orphanProcessTasks[m.id] = nil
-            }
-          }
-          // The group awaits every child of this wave before the loop
-          // refills it, capping concurrent pipelines at the wave size.
-          await group.waitForAll()
+        let tasks = wave.map { meeting in
+          let task = Task { await process(meeting) }
+          orphanProcessTasks[meeting.id] = task
+          return (meeting.id, task)
+        }
+        for (id, task) in tasks {
+          await task.value
+          orphanProcessTasks[id] = nil
         }
       }
     }

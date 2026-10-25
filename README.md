@@ -96,6 +96,8 @@ runs **Release app**, which attaches `Nutola.zip` to that release.
 
 ## Acknowledgements
 
+- This adaptation builds on [Nutola/Nutola](https://github.com/Nutola/Nutola),
+  the Nutola fork previously hosted at `maatheusgois-dd/Nutola`.
 - Based on [conrad-vanl/parfait](https://github.com/conrad-vanl/parfait), which provided
   the original architecture, audio/transcription pipeline and design.
 - [FluidAudio](https://github.com/FluidInference/FluidAudio) (Apache-2.0) provides speaker

@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import Speech
+import Synchronization
 
 /// Real-time, on-device transcription that runs *alongside* recording to feed the
 /// live UI and the `get_live_transcript` MCP tool. Two streaming SpeechTranscribers
@@ -33,13 +34,20 @@ final class LiveTranscriber: @unchecked Sendable {
 
   /// Display name for the local speaker ("You"), overridden with the Zoom
   /// roster's local participant name or NSFullUserName when available.
-  @MainActor static var localSpeakerName: String = "You"
+  private static let speakerNames = Mutex((local: "You", remote: "Others"))
+  static var localSpeakerName: String {
+    get { speakerNames.withLock { $0.local } }
+    set { speakerNames.withLock { $0.local = newValue } }
+  }
 
   /// Display name for the remote speaker ("Others"), overridden with the
   /// single remote Zoom participant when the roster has exactly one non-local name.
-  @MainActor static var remoteSpeakerName: String = "Others"
+  static var remoteSpeakerName: String {
+    get { speakerNames.withLock { $0.remote } }
+    set { speakerNames.withLock { $0.remote = newValue } }
+  }
 
-  @MainActor static func name(for speakerID: String) -> String {
+  static func name(for speakerID: String) -> String {
     switch speakerID {
     case youSpeakerID: return localSpeakerName
     case othersSpeakerID: return remoteSpeakerName
@@ -222,17 +230,15 @@ final class LiveTranscriber: @unchecked Sendable {
     // The remote analyzer may finalize its last sentence during teardown.
     // Resolve all staged microphone lines against the complete remote transcript
     // before the recording session persists live.json and starts batch processing.
-    lock.lock()
-    for segment in pendingMic.values.sorted(by: { $0.start < $1.start }) {
-      if !Self.isPlaybackEcho(segment, among: finalized) {
-        Self.insertChronologically(segment, into: &finalized)
+    let (segments, vol, callback) = lock.withLock {
+      for segment in pendingMic.values.sorted(by: { $0.start < $1.start }) {
+        if !Self.isPlaybackEcho(segment, among: finalized) {
+          Self.insertChronologically(segment, into: &finalized)
+        }
       }
+      pendingMic.removeAll()
+      return (finalized, Self.formattedVolatile(volatile), onUpdate)
     }
-    pendingMic.removeAll()
-    let segments = finalized
-    let vol = Self.formattedVolatile(volatile)
-    let callback = onUpdate
-    lock.unlock()
     callback?(segments, vol)
     return segments
   }

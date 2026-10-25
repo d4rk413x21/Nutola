@@ -227,15 +227,9 @@ struct ClaudeCLI {
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
-        if let stdin {
-            let stdinPipe = Pipe()
+        let stdinPipe = stdin == nil ? nil : Pipe()
+        if let stdinPipe {
             process.standardInput = stdinPipe
-            let stdinData = Data(stdin.utf8)
-            DispatchQueue.global(qos: .utility).async {
-                let writer = stdinPipe.fileHandleForWriting
-                try? writer.write(contentsOf: stdinData)
-                try? writer.close()
-            }
         } else {
             process.standardInput = FileHandle.nullDevice
         }
@@ -246,32 +240,48 @@ struct ClaudeCLI {
         async let stdoutData = readToEnd(stdoutPipe.fileHandleForReading)
         async let stderrData = readToEnd(stderrPipe.fileHandleForReading)
 
-        let status: Int32 = try await withCheckedThrowingContinuation { continuation in
+        let status: Int32 = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                processLock.lock()
+                defer { processLock.unlock() }
+                process.terminationHandler = { proc in
+                    processLock.lock()
+                    if runningProcess === proc { runningProcess = nil }
+                    processLock.unlock()
+                    continuation.resume(returning: proc.terminationStatus)
+                }
+                do {
+                    try Task.checkCancellation()
+                    runningProcess = process
+                    try process.run()
+                    if let stdin, let stdinPipe {
+                        DispatchQueue.global(qos: .utility).async {
+                            let writer = stdinPipe.fileHandleForWriting
+                            try? writer.write(contentsOf: Data(stdin.utf8))
+                            try? writer.close()
+                        }
+                    }
+                } catch {
+                    process.terminationHandler = nil
+                    if runningProcess === process { runningProcess = nil }
+                    try? stdoutPipe.fileHandleForWriting.close()
+                    try? stderrPipe.fileHandleForWriting.close()
+                    if error is CancellationError {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(throwing: ClaudeCLIError.failed(status: -1, stderr: error.localizedDescription))
+                    }
+                }
+            }
+        } onCancel: {
             processLock.lock()
-            runningProcess = process
-            processLock.unlock()
-
-            process.terminationHandler = { proc in
-                processLock.lock()
-                if runningProcess === proc { runningProcess = nil }
-                processLock.unlock()
-                continuation.resume(returning: proc.terminationStatus)
-            }
-            do {
-                try process.run()
-            } catch {
-                processLock.lock()
-                if runningProcess === process { runningProcess = nil }
-                processLock.unlock()
-                try? stdoutPipe.fileHandleForWriting.close()
-                try? stderrPipe.fileHandleForWriting.close()
-                continuation.resume(throwing: ClaudeCLIError.failed(status: -1, stderr: error.localizedDescription))
-                return
-            }
+            defer { processLock.unlock() }
+            if process.isRunning { process.terminate() }
         }
 
         let out = await stdoutData
         let err = await stderrData
+        try Task.checkCancellation()
 
         guard status == 0 else {
             throw ClaudeCLIError.failed(status: status, stderr: tail(String(decoding: err, as: UTF8.self)))

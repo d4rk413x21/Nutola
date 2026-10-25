@@ -219,7 +219,8 @@ struct CodexCLI {
     static func run(
         prompt: String,
         stdin: String? = nil,
-        systemPrompt: String? = nil
+        systemPrompt: String? = nil,
+        analysisOnly: Bool = false
     ) async throws -> RunResult {
         guard isReady else {
             throw isLoggedIn() ? CodexCLIError.notInstalled : CodexCLIError.notLoggedIn
@@ -233,10 +234,10 @@ struct CodexCLI {
             fullPrompt = "\(systemPrompt)\n\n\(prompt)"
         }
 
-        // Bypass approvals so MCP connector calls (e.g. $nutola) aren't auto-cancelled
-        // in non-interactive exec — there is no UI to approve tool use from the Nutola app.
+        let arguments = buildArgs(prompt: fullPrompt, outputFile: outFile, analysisOnly: analysisOnly)
+            .map(shellQuote).joined(separator: " ")
         let cmd = """
-        cd \(shellQuote(workDir.path)) && codex exec --dangerously-bypass-approvals-and-sandbox -s read-only --ephemeral --skip-git-repo-check --output-last-message \(shellQuote(outFile.path)) \(shellQuote(fullPrompt))
+        cd \(shellQuote(workDir.path)) && exec codex \(arguments)
         """
 
         let process = Process()
@@ -244,15 +245,9 @@ struct CodexCLI {
         process.arguments = ["-lc", cmd]
 
         let stderrPipe = Pipe()
-        if let stdin {
-            let stdinPipe = Pipe()
+        let stdinPipe = stdin == nil ? nil : Pipe()
+        if let stdinPipe {
             process.standardInput = stdinPipe
-            let stdinData = Data(stdin.utf8)
-            DispatchQueue.global(qos: .utility).async {
-                let writer = stdinPipe.fileHandleForWriting
-                try? writer.write(contentsOf: stdinData)
-                try? writer.close()
-            }
         } else {
             process.standardInput = FileHandle.nullDevice
         }
@@ -261,30 +256,46 @@ struct CodexCLI {
 
         async let stderrData = readToEnd(stderrPipe.fileHandleForReading)
 
-        let status: Int32 = try await withCheckedThrowingContinuation { continuation in
+        let status: Int32 = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                processLock.lock()
+                defer { processLock.unlock() }
+                process.terminationHandler = { proc in
+                    processLock.lock()
+                    if runningProcess === proc { runningProcess = nil }
+                    processLock.unlock()
+                    continuation.resume(returning: proc.terminationStatus)
+                }
+                do {
+                    try Task.checkCancellation()
+                    runningProcess = process
+                    try process.run()
+                    if let stdin, let stdinPipe {
+                        DispatchQueue.global(qos: .utility).async {
+                            let writer = stdinPipe.fileHandleForWriting
+                            try? writer.write(contentsOf: Data(stdin.utf8))
+                            try? writer.close()
+                        }
+                    }
+                } catch {
+                    process.terminationHandler = nil
+                    if runningProcess === process { runningProcess = nil }
+                    try? stderrPipe.fileHandleForWriting.close()
+                    if error is CancellationError {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(throwing: CodexCLIError.failed(status: -1, stderr: error.localizedDescription))
+                    }
+                }
+            }
+        } onCancel: {
             processLock.lock()
-            runningProcess = process
-            processLock.unlock()
-
-            process.terminationHandler = { proc in
-                processLock.lock()
-                if runningProcess === proc { runningProcess = nil }
-                processLock.unlock()
-                continuation.resume(returning: proc.terminationStatus)
-            }
-            do {
-                try process.run()
-            } catch {
-                processLock.lock()
-                if runningProcess === process { runningProcess = nil }
-                processLock.unlock()
-                try? stderrPipe.fileHandleForWriting.close()
-                continuation.resume(throwing: CodexCLIError.failed(status: -1, stderr: error.localizedDescription))
-                return
-            }
+            defer { processLock.unlock() }
+            if process.isRunning { process.terminate() }
         }
 
         let err = await stderrData
+        try Task.checkCancellation()
         guard status == 0 else {
             throw CodexCLIError.failed(status: status, stderr: tail(String(decoding: err, as: UTF8.self)))
         }
@@ -292,6 +303,23 @@ struct CodexCLI {
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !text.isEmpty else { throw CodexCLIError.badOutput }
         return RunResult(text: text)
+    }
+
+    static func buildArgs(prompt: String, outputFile: URL, analysisOnly: Bool = false) -> [String] {
+        var args: [String]
+        if analysisOnly {
+            // Analyze untrusted meeting text without loading connectors, hooks, or shell tools.
+            args = ["--no-daemon", "--ask-for-approval", "never", "exec",
+                    "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only",
+                    "--config", "web_search=\"disabled\""]
+            for feature in ["shell_tool", "plugins", "apps", "multi_agent", "view_image", "image_generation", "computer_use"] {
+                args += ["--disable", feature]
+            }
+        } else {
+            // Preserve the existing Ask/summarization invocation, which may use configured connectors.
+            args = ["exec", "--dangerously-bypass-approvals-and-sandbox", "-s", "read-only"]
+        }
+        return args + ["--ephemeral", "--skip-git-repo-check", "--output-last-message", outputFile.path, prompt]
     }
 
     private static func shellQuote(_ text: String) -> String {

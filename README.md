@@ -206,6 +206,25 @@ model; prose under a heading tells it what belongs there. Placeholders: `{{title
   deletable) — anyone with the link can view the page; the browser preview and HTML export never
   leave your Mac.
 
+## Development task drafts
+
+Open a processed meeting and choose **Development tasks**. Select your signed-in Claude or
+Codex CLI, then **Extract tasks**. The full saved transcript is analyzed in parts; later parts
+can refine or cancel earlier requests. Each draft includes editable text, an optional owner,
+and original transcript passages with speaker names and timestamps. Unassigned work stays
+unassigned.
+
+Drafts are saved alongside the meeting in `development-tasks.json`. Re-extracting asks before
+replacing edits; failures and cancellation keep existing drafts. A warning appears if the
+transcript has changed since extraction. Select drafts and use **Copy selected drafts** to
+copy their descriptions and evidence for use in Linear. This workflow prepares local drafts;
+it does not create Linear issues.
+
+Extraction sends the transcript through the selected CLI account. Claude runs without tools;
+Codex uses an isolated read-only invocation without user configuration, connectors, or shell
+tools. A recent Codex CLI supporting `--ignore-user-config` is required. No API key is added
+to Nutola.
+
 ## Development
 
 ```bash

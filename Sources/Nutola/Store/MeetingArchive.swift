@@ -198,6 +198,26 @@ final class MeetingArchive: @unchecked Sendable {
         }
     }
 
+    // MARK: - Development task drafts
+
+    func developmentTasks(for id: UUID) throws -> DevelopmentTaskReview? {
+        try queue.sync {
+            let url = folder(for: id).appendingPathComponent("development-tasks.json")
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            return try decoder.decode(DevelopmentTaskReview.self, from: Data(contentsOf: url))
+        }
+    }
+
+    func saveDevelopmentTasks(_ review: DevelopmentTaskReview, for id: UUID) throws {
+        try queue.sync {
+            guard FileManager.default.fileExists(atPath: folder(for: id).appendingPathComponent("meeting.json").path) else {
+                throw ArchiveError.meetingDeleted
+            }
+            try encoder.encode(review).write(
+                to: folder(for: id).appendingPathComponent("development-tasks.json"), options: .atomic)
+        }
+    }
+
 
     // MARK: - Live transcript (present only while a meeting is recording)
 

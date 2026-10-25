@@ -56,6 +56,38 @@ final class StoreTests: XCTestCase {
         XCTAssertEqual(archive.transcript(for: m.id), segments)
     }
 
+    func testDevelopmentDraftsRoundTripWithoutChangingMeetingNotes() throws {
+        let meeting = makeMeeting()
+        try archive.save(meeting)
+        try archive.saveSummary("Existing notes", for: meeting.id)
+        XCTAssertNil(try archive.developmentTasks(for: meeting.id))
+        let evidence = [TranscriptSegment(speakerID: "me", start: 2, end: 3, text: "Fix login.")]
+        let review = DevelopmentTaskReview(
+            transcriptFingerprint: try DevelopmentTaskReview.fingerprint(evidence),
+            tasks: [DevelopmentTaskDraft(title: "Fix login", detail: "Handle expired tokens.", evidence: evidence)])
+        try archive.saveDevelopmentTasks(review, for: meeting.id)
+        XCTAssertEqual(try archive.developmentTasks(for: meeting.id), review)
+        XCTAssertEqual(archive.summary(for: meeting.id), "Existing notes")
+        XCTAssertEqual(archive.meeting(id: meeting.id), meeting)
+    }
+
+    func testDevelopmentDraftsCannotResurrectDeletedMeetings() throws {
+        let meeting = makeMeeting()
+        try archive.save(meeting)
+        try archive.delete(id: meeting.id)
+        XCTAssertThrowsError(try archive.saveDevelopmentTasks(DevelopmentTaskReview(), for: meeting.id))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: archive.folder(for: meeting.id).path))
+    }
+
+    func testCorruptDevelopmentDraftsAreReportedInsteadOfDiscarded() throws {
+        let meeting = makeMeeting()
+        try archive.save(meeting)
+        let file = archive.folder(for: meeting.id).appendingPathComponent("development-tasks.json")
+        try Data("invalid json".utf8).write(to: file)
+        XCTAssertThrowsError(try archive.developmentTasks(for: meeting.id))
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "invalid json")
+    }
+
     func testSummaryRoundTrip() throws {
         let m = makeMeeting()
         try archive.save(m)

@@ -19,6 +19,7 @@ struct MeetingDetailView: View {
     @State private var sideNotesSaveTask: Task<Void, Never>?
     @State private var decisionsExpanded = true
     @State private var showShareNotes = false
+    @State private var showDevelopmentTasks = false
     @State private var shareNotesState: ShareNotesState = .idle
     @AppStorage(SettingsKey.sideNotesPanelWidth) private var sideNotesWidth = 280.0
 
@@ -124,6 +125,9 @@ struct MeetingDetailView: View {
         .sheet(isPresented: $showShareNotes) {
             shareNotesSheet
         }
+        .sheet(isPresented: $showDevelopmentTasks) {
+            DevelopmentTasksSheet(meeting: meeting)
+        }
     }
 
     private var isRecordingThisMeeting: Bool {
@@ -177,6 +181,13 @@ struct MeetingDetailView: View {
             if case .done = publishState {
                 GranolaChip(icon: "checkmark.circle.fill", text: "Shared", accent: Theme.mint(scheme))
             }
+            Button {
+                showDevelopmentTasks = true
+            } label: {
+                Label("Development tasks", systemImage: "checklist")
+            }
+            .buttonStyle(.borderless)
+            .disabled(isRecordingThisMeeting || meeting.state == .processing)
             Button {
                 copyTranscript()
             } label: {

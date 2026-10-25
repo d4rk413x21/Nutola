@@ -1,13 +1,12 @@
 APP_NAME   := Nutola
-BUNDLE_ID  := io.github.matheusgois-dd.Nutola
+BUNDLE_ID  := $(shell /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' packaging/Info.plist)
 DIST       := dist
 APP        := $(DIST)/$(APP_NAME).app
 BINARY     := .build/release/$(APP_NAME)
 # Ad-hoc by default. For a stable TCC identity across rebuilds we pin an explicit
 # designated requirement. Set SIGN_ID to your "Apple Development: ..." identity
 # for the best experience (permissions survive rebuilds without re-prompting).
-# The release pipeline (.github/workflows/release.yml) overrides SIGN_ID with the
-# "Developer ID Application: ..." identity so the notarized build reuses this logic.
+# Release builds use the same signing configuration unless SIGN_ID is supplied.
 SIGN_ID    ?= -
 
 # Hardened Runtime (-o runtime + entitlements) is required for notarization and is the
@@ -43,6 +42,7 @@ app: build
 	B=$$(echo "$$V" | tr -d '.'); \
 	python3 -c "import plistlib; p='$(APP)/Contents/Info.plist'; d=plistlib.load(open(p,'rb')); d['CFBundleShortVersionString']='$$V'; d['CFBundleVersion']='$$B'; plistlib.dump(d, open(p,'wb'))"
 	cp Resources/AppIcon.icns "$(APP)/Contents/Resources/AppIcon.icns"
+	cp LICENSE "$(APP)/Contents/Resources/LICENSE"
 	@# SwiftPM resource bundle (menu bar icon) must ride along or Bundle.module lookups fail
 	@if [ -d ".build/release/$(APP_NAME)_$(APP_NAME).bundle" ]; then \
 		cp -R ".build/release/$(APP_NAME)_$(APP_NAME).bundle" "$(APP)/Contents/Resources/"; \
@@ -52,6 +52,7 @@ app: build
 	@# com.apple.security.* keys, honored ad-hoc with no provisioning profile.
 	codesign --force --sign "$(SIGN_ID)" $(RUNTIME_ARGS) \
 		-r='designated => identifier "$(BUNDLE_ID)"' "$(APP)"
+	codesign --verify --deep --strict "$(APP)"
 	@echo "Built $(APP) (HARDENED=$(HARDENED))"
 
 run: app

@@ -62,7 +62,7 @@ final class PlatformSpeakerTests: XCTestCase {
     func testActiveSpeakerNamesFromZoomTileDescriptions() {
         // Regression: Zoom Workplace exposes active speaker on AXTabGroup descriptions.
         let samples = [
-            "Matheus Gois, Computer audio unmuted, Video on",
+            "Taylor Morgan, Computer audio unmuted, Video on",
             "Gui Lima, Computer audio unmuted, Video on",
             "Paulo Henrique Paulin, Computer audio unmuted, Video on, active speaker",
         ]

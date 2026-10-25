@@ -6,7 +6,7 @@ import Foundation
 ///   Nutola --version
 @main
 enum Bootstrap {
-    static let version = "0.1.0"
+    static var version: String { AppVersion.displayVersion ?? "development" }
 
     enum Route: Equatable {
         case version
@@ -26,11 +26,15 @@ enum Bootstrap {
         // A claude/gh subprocess (or the MCP client) exiting before draining a
         // pipe would otherwise SIGPIPE-kill the whole app mid-recording.
         signal(SIGPIPE, SIG_IGN)
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        let destination = route(arguments: arguments)
+        if destination == .app, Bundle.main.bundleIdentifier == AppIdentity.bundleIdentifier {
+            AppIdentity.importPreviousPreferences()
+        }
         // Opt-in crash handlers (no-op unless AppSettings.crashDiagnostics is on).
         // Installed before NutolaApp.main() so an early crash is still captured.
         CrashDiagnosticLog.install()
-        let arguments = Array(CommandLine.arguments.dropFirst())
-        switch route(arguments: arguments) {
+        switch destination {
         case .version:
             print("nutola \(version)")
         case .mcp:

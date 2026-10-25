@@ -125,7 +125,7 @@ enum HTMLExporter {
         </header>
         \(summaryBlock)
         \(transcriptBlock)
-        <footer>Recorded with <a href="https://github.com/conrad-vanl/nutola">Nutola</a></footer>
+        <footer>Recorded with <a href="\(AppIdentity.repositoryURL.absoluteString)">Nutola</a></footer>
         </main>
         </body>
         </html>

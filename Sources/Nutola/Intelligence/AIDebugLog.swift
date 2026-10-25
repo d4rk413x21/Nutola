@@ -65,7 +65,7 @@ struct AIDebugLogPanel: View {
             }
             ScrollView {
                 Text(log.allText.isEmpty
-                     ? "Activity from recording, Zoom speaker tracking, transcription, and AI appears here. Filter Console.app with subsystem io.github.matheusgois-dd.Nutola."
+                     ? "Activity from recording, Zoom speaker tracking, transcription, and AI appears here. Filter Console.app with subsystem io.github.d4rk413x21.Nutola."
                      : log.allText)
                     .font(.system(size: 10, design: .monospaced))
                     .textSelection(.enabled)

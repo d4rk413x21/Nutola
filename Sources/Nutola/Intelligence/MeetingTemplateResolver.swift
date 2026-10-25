@@ -59,7 +59,7 @@ enum MeetingTemplateResolver {
     ///
     /// Title wins over attendees wins over keywords: a "Daily Standup" with an
     /// outside guest is still a standup. The title is matched against substrings
-    /// (case-insensitive) so "Victor/Matheus 1:1" and "Weekly Execution Review"
+    /// (case-insensitive) so "Victor/Taylor 1:1" and "Weekly Execution Review"
     /// both resolve without needing exact-word boundaries.
     static func resolve(
         title: String,

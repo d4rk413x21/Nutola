@@ -10,7 +10,7 @@ final class ZoomSpeakerTracker: PlatformSpeakerTracker, @unchecked Sendable {
     private let archive: MeetingArchive
     private let startDate: Date
     private let elapsedOffset: TimeInterval
-    private let queue = DispatchQueue(label: "io.github.matheusgois-dd.Nutola.zoom-speakers")
+    private let queue = DispatchQueue(label: "io.github.d4rk413x21.Nutola.zoom-speakers")
     /// Interval between active-speaker polls (seconds). 400 ms balances responsiveness
     /// against AX-tree traversal cost on long calls.
     private static let zoomPollInterval: TimeInterval = 0.4

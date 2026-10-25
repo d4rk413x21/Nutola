@@ -633,7 +633,7 @@ struct AILauncherView: View {
                 title: "\(preferredAIProvider.displayName) CLI isn't installed",
                 linkTitle: "Get \(preferredAIProvider.displayName)",
                 linkURL: URL(string: preferredAIProvider == .opencode
-                    ? "https://opencode.ai/docs/" : "https://github.com/mistralai/mistral-vibe")!)
+                    ? "https://opencode.ai/docs/" : "https://docs.mistral.ai/vibe/code/overview")!)
         }
     }
 

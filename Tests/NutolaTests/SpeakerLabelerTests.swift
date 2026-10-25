@@ -18,7 +18,7 @@ final class SpeakerLabelerTests: XCTestCase {
             segments: [word("Hello there.", 0, 0.9), word("Second thought.", 2, 3)]
         )
         let (segments, speakers) = SpeakerLabeler.label(
-            mic: mic, system: nil, systemTurns: nil, myName: "Conrad")
+            mic: mic, system: nil, systemTurns: nil, myName: "Alex")
 
         XCTAssertEqual(segments.count, 2)
         XCTAssertEqual(segments.map(\.speakerID), ["me", "me"])
@@ -27,7 +27,7 @@ final class SpeakerLabelerTests: XCTestCase {
         XCTAssertEqual(segments[0].end, 0.9)
         XCTAssertEqual(segments[1].start, 2)
         XCTAssertEqual(segments[1].end, 3)
-        XCTAssertEqual(speakers, [Speaker(id: "me", name: "Conrad", isMe: true)])
+        XCTAssertEqual(speakers, [Speaker(id: "me", name: "Alex", isMe: true)])
     }
 
     // MARK: - System with diarized turns
@@ -201,7 +201,7 @@ final class SpeakerLabelerTests: XCTestCase {
         )
         let turns = [turn("S1", 0, 10)]
         let (segments, speakers) = SpeakerLabeler.label(
-            mic: mic, system: system, systemTurns: turns, myName: "Conrad")
+            mic: mic, system: system, systemTurns: turns, myName: "Alex")
 
         XCTAssertEqual(segments.map(\.start), [0, 1, 5, 5, 8])
         XCTAssertEqual(segments.map(\.speakerID), ["s1", "me", "me", "s1", "s1"])
@@ -218,10 +218,10 @@ final class SpeakerLabelerTests: XCTestCase {
         )
         let turns = [turn("S1", 2, 4), turn("S2", 5, 8)]
         let (_, speakers) = SpeakerLabeler.label(
-            mic: mic, system: system, systemTurns: turns, myName: "Conrad")
+            mic: mic, system: system, systemTurns: turns, myName: "Alex")
 
         XCTAssertEqual(speakers.map(\.id), ["me", "s1", "s2"])
-        XCTAssertEqual(speakers.map(\.name), ["Conrad", "Speaker 1", "Speaker 2"])
+        XCTAssertEqual(speakers.map(\.name), ["Alex", "Speaker 1", "Speaker 2"])
     }
 
     // MARK: - Empty inputs

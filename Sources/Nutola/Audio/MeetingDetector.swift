@@ -14,7 +14,7 @@ struct MicEvent: Sendable {
 /// the "a meeting just started" signal. Observation needs no permissions.
 /// All mutable state is confined to `queue`.
 final class MeetingDetector: @unchecked Sendable {
-    private let queue = DispatchQueue(label: "io.github.matheusgois-dd.Nutola.detector")
+    private let queue = DispatchQueue(label: "io.github.d4rk413x21.Nutola.detector")
     private var onEvent: (@Sendable (MicEvent) -> Void)?
     private var processListeners: [AudioObjectID: AudioObjectPropertyListenerBlock] = [:]
     private var lastState: [AudioObjectID: (pid: pid_t, running: Bool)] = [:]
@@ -26,7 +26,7 @@ final class MeetingDetector: @unchecked Sendable {
     private var systemListener: AudioObjectPropertyListenerBlock?
     private var pollTimer: DispatchSourceTimer?
     private let ownPID = getpid()
-    private let log = Logger(subsystem: "io.github.matheusgois-dd.Nutola", category: "detector")
+    private let log = Logger(subsystem: AppIdentity.bundleIdentifier, category: "detector")
 
     private static func address(_ selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
         AudioObjectPropertyAddress(

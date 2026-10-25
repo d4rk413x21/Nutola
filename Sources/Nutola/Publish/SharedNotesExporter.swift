@@ -135,7 +135,7 @@ enum SharedNotesExporter {
         \(summaryBlock)
         \(itemsBlock)
         \(transcriptBlock)
-        <footer>Shared via <a href="https://github.com/conrad-vanl/nutola">Nutola</a></footer>
+        <footer>Shared via <a href="\(AppIdentity.repositoryURL.absoluteString)">Nutola</a></footer>
         </main>
         </body>
         </html>

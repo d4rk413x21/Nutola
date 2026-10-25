@@ -28,7 +28,7 @@ final class TokenUsageTracker: ObservableObject, @unchecked Sendable {
 
     private let defaults: UserDefaults
     private let key: String
-    private let queue = DispatchQueue(label: "io.github.matheusgois-dd.Nutola.token-usage", qos: .utility)
+    private let queue = DispatchQueue(label: "io.github.d4rk413x21.Nutola.token-usage", qos: .utility)
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"

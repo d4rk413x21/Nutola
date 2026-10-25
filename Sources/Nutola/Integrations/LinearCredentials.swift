@@ -6,7 +6,7 @@ enum LinearCredentials {
     // Use the login Keychain: Nutola also supports ad-hoc signing without access-group entitlements.
     private static var query: [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: "io.github.matheusgois-dd.Nutola.linear",
+         kSecAttrService as String: AppIdentity.bundleIdentifier + ".linear",
          kSecAttrAccount as String: "personal-api-key"]
     }
 

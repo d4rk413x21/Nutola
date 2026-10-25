@@ -187,9 +187,9 @@ describe('parsePath — accept', () => {
   // both must change together.
   test('decodes the app golden 32-hex token', () => {
     assert.deepEqual(
-      parsePath('/C2NvbnJhZC12YW5sASNFZ4mrze8BI0VniavN76vN7wEjRWeJq83vASNFZ4mrze8B'),
+      parsePath('/C3NhbXBsZS11c2VyASNFZ4mrze8BI0VniavN76vN7wEjRWeJq83vASNFZ4mrze8B'),
       {
-        user: 'conrad-vanl',
+        user: 'sample-user',
         gistId: '0123456789abcdef0123456789abcdef',
         sha: 'abcdef0123456789abcdef0123456789abcdef01',
         filename: 'meeting.html',
@@ -199,9 +199,9 @@ describe('parsePath — accept', () => {
 
   test('decodes the app golden 20-hex token', () => {
     assert.deepEqual(
-      parsePath('/C2NvbnJhZC12YW5sASNFZ4mrze8BI6vN7wEjRWeJq83vASNFZ4mrze8B'),
+      parsePath('/C3NhbXBsZS11c2VyASNFZ4mrze8BI6vN7wEjRWeJq83vASNFZ4mrze8B'),
       {
-        user: 'conrad-vanl',
+        user: 'sample-user',
         gistId: '0123456789abcdef0123',
         sha: 'abcdef0123456789abcdef0123456789abcdef01',
         filename: 'meeting.html',

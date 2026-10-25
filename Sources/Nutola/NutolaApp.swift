@@ -36,7 +36,7 @@ struct NutolaApp: App {
                 Button("About Nutola") {
                     NSApp.orderFrontStandardAboutPanel(options: [
                         .credits: NSAttributedString(
-                            string: "On-device meeting notes.\ngithub.com/conrad-vanl/nutola",
+                            string: "Meeting notes and development tasks.\n\(AppIdentity.repositoryURL.absoluteString)",
                             attributes: [.font: NSFont.systemFont(ofSize: 11)])
                     ])
                 }

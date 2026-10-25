@@ -41,7 +41,7 @@ final class MeetingTemplateResolverTests: XCTestCase {
 
     func testOneOnOneDetection() {
         let type = MeetingTemplateResolver.resolve(
-            title: "Victor/Matheus 1:1",
+            title: "Victor/Taylor 1:1",
             attendees: [],
             transcriptKeywords: [])
         XCTAssertEqual(type, .oneOnOne)
@@ -49,7 +49,7 @@ final class MeetingTemplateResolverTests: XCTestCase {
 
     func testOneOnOneMatchesVariants() {
         XCTAssertEqual(
-            MeetingTemplateResolver.resolve(title: "Victor / Matheus 1-on-1", attendees: [], transcriptKeywords: []),
+            MeetingTemplateResolver.resolve(title: "Victor / Taylor 1-on-1", attendees: [], transcriptKeywords: []),
             .oneOnOne)
         XCTAssertEqual(
             MeetingTemplateResolver.resolve(title: "one on one with Dana", attendees: [], transcriptKeywords: []),

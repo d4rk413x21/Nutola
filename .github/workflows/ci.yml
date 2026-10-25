@@ -19,6 +19,16 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - name: Detect packaging changes
+        id: packaging
+        run: |
+          if git diff --quiet HEAD^ HEAD -- Makefile packaging/ Sources/Nutola/App/AppIdentity.swift; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Restore SwiftPM cache
         id: spm-cache
         uses: actions/cache/restore@v6
@@ -37,19 +47,17 @@ jobs:
           key: ${{ steps.spm-cache.outputs.cache-primary-key }}
       # Model-dependent paths (FoundationModels, SpeechAnalyzer assets) are
       # unavailable on hosted runners; tests cover only pure logic by design.
-      # Build a temporary, ad-hoc-signed .app only when this workflow is
-      # started explicitly from Actions -> CI -> Run workflow on a branch.
-      # Pushes and pull requests still run compile + tests without packaging.
-      - name: Assemble preview app (manual only)
-        if: github.event_name == 'workflow_dispatch'
+      # Package only when build metadata changes or a preview is requested manually.
+      - name: Assemble and verify preview app
+        if: github.event_name == 'workflow_dispatch' || steps.packaging.outputs.changed == 'true'
         run: make app
 
-      - name: Zip preview app (manual only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Zip preview app
+        if: github.event_name == 'workflow_dispatch' || steps.packaging.outputs.changed == 'true'
         run: ditto -c -k --keepParent dist/Nutola.app dist/Nutola.zip
 
-      - name: Upload preview artifact (manual only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Upload preview artifact
+        if: github.event_name == 'workflow_dispatch' || steps.packaging.outputs.changed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: Nutola-preview

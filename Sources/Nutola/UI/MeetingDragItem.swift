@@ -10,5 +10,5 @@ struct MeetingDragItem: Transferable, Codable {
 }
 
 extension UTType {
-    static let meetingDrag = UTType(exportedAs: "io.github.matheusgois-dd.nutola.meeting-drag")
+    static let meetingDrag = UTType(exportedAs: "io.github.d4rk413x21.nutola.meeting-drag")
 }

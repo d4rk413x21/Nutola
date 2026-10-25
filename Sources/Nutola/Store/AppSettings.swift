@@ -41,7 +41,7 @@ enum SettingsKey {
     static let fillerRemoval = "fillerRemoval"                 // strip uh/um/er/hmm from transcripts before summarizing
     static let personalDictionary = "personalDictionary"         // [PersonalDictionaryStore.Entry] JSON: custom vocab + replacements
     static let taskTracker = "taskTracker"                       // [TrackedTask] JSON: persistent activity tracker
-    static let ownerAliases = "ownerAliases"                     // [OwnerAlias] JSON: merge rule "You/Matheus" → "Matheus"
+    static let ownerAliases = "ownerAliases"                     // [OwnerAlias] JSON: merge rule "You/Taylor" → "Taylor"
     static let currentUserName = "currentUserName"              // display name for "me" — used by the activity tracker
 }
 

@@ -9,7 +9,7 @@ final class RecordingServiceImpl: RecordingService {
   private(set) var currentSession: RecordingSession?
   private(set) var recordingMeeting: Meeting?
   private var _isStartingRecording = false
-  private let log = Logger(subsystem: "io.github.matheusgois-dd.Nutola", category: "recording")
+  private let log = Logger(subsystem: AppIdentity.bundleIdentifier, category: "recording")
   /// Per-meeting transcription locale overrides. Injected by the dependency
   /// container; nil in tests means "auto" for every meeting.
   var localeStore: TranscriptionLocaleStore?
@@ -372,7 +372,7 @@ final class RecordingServiceImpl: RecordingService {
 final class NotificationServiceImpl: NotificationService, @unchecked Sendable {
   private var onReadyTapped: (@Sendable (UUID) -> Void)?
   private var detectionChime: NSSound?
-  private let log = Logger(subsystem: "io.github.matheusgois-dd.Nutola", category: "notifications")
+  private let log = Logger(subsystem: AppIdentity.bundleIdentifier, category: "notifications")
 
   func configure(onReadyTapped: @escaping @Sendable (UUID) -> Void) {
     self.onReadyTapped = onReadyTapped

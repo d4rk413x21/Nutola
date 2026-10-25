@@ -22,7 +22,7 @@ final class MeetingArchive: @unchecked Sendable {
             .appendingPathComponent("Nutola", isDirectory: true)
     }
 
-    private let queue = DispatchQueue(label: "io.github.matheusgois-dd.Nutola.archive")
+    private let queue = DispatchQueue(label: "io.github.d4rk413x21.Nutola.archive")
     // ISO8601 with fractional seconds so Dates round-trip losslessly enough for Equatable.
     private static let dateFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()

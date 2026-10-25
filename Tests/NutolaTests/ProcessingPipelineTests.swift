@@ -17,7 +17,7 @@ final class ProcessingPipelineTests: XCTestCase {
         ]
         let accurate = [
             seg("s1", "Let's ship the release today."),
-            seg("Conrad", "Sounds good — I'll cut the branch"),
+            seg("Alex", "Sounds good — I'll cut the branch"),
         ]
         XCTAssertTrue(ProcessingPipeline.sameContent(live, accurate))
     }

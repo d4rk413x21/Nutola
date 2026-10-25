@@ -32,14 +32,14 @@ final class AdditionalParticipantsAnnotatorTests: XCTestCase {
     }
 
     func testExcludesLocalParticipant() {
-        // Default local-participant check: "Matheus Gois" is the Mac account holder.
+        // Default local-participant check: "Taylor Morgan" is the Mac account holder.
         let result = AdditionalParticipantsAnnotator.annotation(
-            roster: ["Matheus Gois", "Alice"],
+            roster: ["Taylor Morgan", "Alice"],
             attendees: [],
-            localParticipantCheck: { $0 == "Matheus Gois" })
+            localParticipantCheck: { $0 == "Taylor Morgan" })
         XCTAssertNotNil(result)
         XCTAssertTrue(result!.contains("Alice"))
-        XCTAssertFalse(result!.contains("Matheus Gois"))
+        XCTAssertFalse(result!.contains("Taylor Morgan"))
     }
 
     func testCaseInsensitiveMatching() {

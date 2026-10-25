@@ -11,7 +11,7 @@ import Foundation
 /// read after a hang/crash. A daily rotation keeps a bounded history
 /// (`nutola-YYYY-MM-DD.log`, pruned to `maxRetainedFiles`).
 enum NutolaFileLog {
-    private static let queue = DispatchQueue(label: "io.github.matheusgois-dd.Nutola.filelog")
+    private static let queue = DispatchQueue(label: "io.github.d4rk413x21.Nutola.filelog")
     private static let maxRetainedFiles = 14
     private static let dateFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()

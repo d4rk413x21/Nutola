@@ -8,7 +8,7 @@ import Foundation
 final class FolderArchive: @unchecked Sendable {
     let root: URL
 
-    private let queue = DispatchQueue(label: "io.github.matheusgois-dd.Nutola.folders")
+    private let queue = DispatchQueue(label: "io.github.d4rk413x21.Nutola.folders")
     private static let dateFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

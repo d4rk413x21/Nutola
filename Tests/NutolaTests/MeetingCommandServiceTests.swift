@@ -14,7 +14,7 @@ final class MeetingCommandServiceTests: XCTestCase {
         service = MeetingCommandService(archive: archive)
 
         var value = Meeting(title: "Roadmap sync", createdAt: Date(timeIntervalSince1970: 1_700_000_000))
-        value.attendees = ["Priya", "Matheus"]
+        value.attendees = ["Priya", "Taylor"]
         value.speakers = [
             Speaker(id: "me", name: "Me", isMe: true),
             Speaker(id: "s1", name: "Priya"),
@@ -59,7 +59,7 @@ final class MeetingCommandServiceTests: XCTestCase {
     func testShowIncludesMetadataSummaryAttendeesAndSpeakers() throws {
         let result = try service.show(id: meeting.id.uuidString)
 
-        XCTAssertTrue(result.contains("Attendees: Priya, Matheus"))
+        XCTAssertTrue(result.contains("Attendees: Priya, Taylor"))
         XCTAssertTrue(result.contains("Speakers: Me, Priya"))
         XCTAssertTrue(result.contains("Launch moved to March."))
     }

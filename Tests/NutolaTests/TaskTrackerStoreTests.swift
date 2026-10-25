@@ -120,7 +120,7 @@ final class TaskTrackerStoreTests: XCTestCase {
         - [ ] Fix bug — Bob
         - [x] Already done
         """
-        store.syncFromMeeting(meeting, summary: summary, currentUser: "Matheus")
+        store.syncFromMeeting(meeting, summary: summary, currentUser: "Taylor")
 
         XCTAssertEqual(store.tasks.count, 3)
         XCTAssertTrue(store.tasks.contains { $0.text == "Review PR" && $0.owner == "Alice" })

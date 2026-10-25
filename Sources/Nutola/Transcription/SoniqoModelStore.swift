@@ -1,8 +1,7 @@
 import AppKit
 import Foundation
 
-/// Soniqo Parakeet CoreML models used for on-device speech recognition (same weights
-/// as [anarlog](https://github.com/fastrepl/anarlog)). Downloads Hugging Face repos
+/// Soniqo Parakeet CoreML models used for on-device speech recognition. Downloads Hugging Face repos
 /// into `~/Library/Application Support/Nutola/Models/Soniqo/`. Inference is not
 /// implemented here — this type only manages the bytes on disk.
 enum SoniqoModel: String, CaseIterable, Hashable, Sendable {

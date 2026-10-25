@@ -18,12 +18,8 @@ enum AppVersion {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
     }
 
-    /// Direct link to the changelog on GitHub so the About row can deep-link.
-    /// Uses the org/repo from the bundle identifier when available; falls back
-    /// to the canonical Nutola repo URL.
     static var changelogURL: URL {
-        let raw = "https://github.com/maatheusgois-dd/Nutola/blob/main/CHANGELOG.md"
-        return URL(string: raw) ?? URL(string: "https://github.com/maatheusgois-dd/Nutola")!
+        AppIdentity.repositoryURL.appending(path: "blob/main/CHANGELOG.md")
     }
 
     /// Fallback for contexts where the bundle isn't present (tests, CLI runs):

@@ -92,8 +92,8 @@ struct TaskDayInsight: Equatable, Sendable {
 }
 
 /// A merge rule: raw owner labels matching `from` (case-insensitive) are
-/// displayed and stored as `to`. Lets the user merge "You/Matheus" →
-/// "Matheus" or rename "Speaker 11" → "Victor" across all tasks.
+/// displayed and stored as `to`. Lets the user merge "You/Taylor" →
+/// "Taylor" or rename "Speaker 11" → "Victor" across all tasks.
 struct OwnerAlias: Codable, Identifiable, Equatable, Sendable {
     var id: UUID = UUID()
     var from: String

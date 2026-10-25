@@ -27,34 +27,34 @@ final class CLIExecutableTests: XCTestCase {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("#!/bin/sh\nexit 0\n".utf8).write(to: url)
         try FileManager.default.setAttributes([.posixPermissions: executable ? 0o755 : 0o644], ofItemAtPath: url.path)
-        return url
+        return url.resolvingSymlinksInPath()
     }
 
     func testFindsCodexInVSCodeAndInsiders() throws {
         let stable = try binary(".vscode/extensions/openai.chatgpt-1.0.0-darwin-\(platform)/\(codexPath)")
-        XCTAssertEqual(CLIExecutable.bundled("codex", home: home), stable)
+        XCTAssertEqual(CLIExecutable.bundled("codex", home: home)?.resolvingSymlinksInPath(), stable)
         let insiders = try binary(".vscode-insiders/extensions/openai.chatgpt-2.0.0-darwin-\(platform)/\(codexPath)")
-        XCTAssertEqual(CLIExecutable.bundled("codex", home: home), insiders)
+        XCTAssertEqual(CLIExecutable.bundled("codex", home: home)?.resolvingSymlinksInPath(), insiders)
     }
 
     func testFindsClaudeNativeBinaryInBothEditors() throws {
         let stable = try binary(".vscode/extensions/anthropic.claude-code-2.1.9-darwin-\(platform)/resources/native-binary/claude")
-        XCTAssertEqual(CLIExecutable.bundled("claude", home: home), stable)
+        XCTAssertEqual(CLIExecutable.bundled("claude", home: home)?.resolvingSymlinksInPath(), stable)
         try FileManager.default.removeItem(at: stable)
         let insiders = try binary(".vscode-insiders/extensions/anthropic.claude-code-2.1.10-darwin-\(platform)/resources/native-binary/claude")
-        XCTAssertEqual(CLIExecutable.bundled("claude", home: home), insiders)
+        XCTAssertEqual(CLIExecutable.bundled("claude", home: home)?.resolvingSymlinksInPath(), insiders)
     }
 
     func testChoosesNewestExecutableVersionUsingNumericOrder() throws {
         try binary(".vscode/extensions/openai.chatgpt-1.9.0/\(codexPath)")
         let newest = try binary(".vscode/extensions/openai.chatgpt-1.10.0/\(codexPath)")
         try binary(".vscode/extensions/openai.chatgpt-1.11.0/\(codexPath)", executable: false)
-        XCTAssertEqual(CLIExecutable.bundled("codex", home: home), newest)
+        XCTAssertEqual(CLIExecutable.bundled("codex", home: home)?.resolvingSymlinksInPath(), newest)
     }
 
     func testSupportsLegacyCodexBundleLayout() throws {
         let expected = try binary(".vscode/extensions/openai.chatgpt-1.0.0/\(legacyCodexPath)")
-        XCTAssertEqual(CLIExecutable.bundled("codex", home: home), expected)
+        XCTAssertEqual(CLIExecutable.bundled("codex", home: home)?.resolvingSymlinksInPath(), expected)
     }
 
     func testIgnoresOtherExtensionsAndWrongPlatforms() throws {
@@ -69,12 +69,12 @@ final class CLIExecutableTests: XCTestCase {
 
     func testRescansAfterExtensionUpdateAndDoesNotTreatDirectoriesAsBinaries() throws {
         let old = try binary(".vscode/extensions/openai.chatgpt-1.0.0/\(codexPath)")
-        XCTAssertEqual(CLIExecutable.bundled("codex", home: home), old)
+        XCTAssertEqual(CLIExecutable.bundled("codex", home: home)?.resolvingSymlinksInPath(), old)
         try FileManager.default.removeItem(at: old)
         try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
         XCTAssertNil(CLIExecutable.bundled("codex", home: home))
         let updated = try binary(".vscode/extensions/openai.chatgpt-2.0.0/\(codexPath)")
-        XCTAssertEqual(CLIExecutable.bundled("codex", home: home), updated)
+        XCTAssertEqual(CLIExecutable.bundled("codex", home: home)?.resolvingSymlinksInPath(), updated)
     }
 
     func testLaunchUsesResolvedPathAndQuotesPromptAndDirectory() throws {

@@ -16,7 +16,7 @@ final class CalendarStore: ObservableObject {
     @Published private(set) var lastRefresh: Date?
     @Published private(set) var fetchHorizonDays = defaultFetchHorizonDays
 
-    private var eventStore: EKEventStore = EKEventStore()
+    private let eventReader = CalendarEventReader()
     private var observers: [NSObjectProtocol] = []
     private var debounceTask: Task<Void, Never>?
     private var ticker: Timer?
@@ -30,7 +30,7 @@ final class CalendarStore: ObservableObject {
         startTicker()
     }
 
-    deinit {
+    isolated deinit {
         for observer in observers {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -53,7 +53,7 @@ final class CalendarStore: ObservableObject {
             try? await Task.sleep(for: Self.resetRetryDelay)
         }
         guard CalendarAuthorization.isAuthorized else { return }
-        eventStore = EKEventStore()
+        await eventReader.reset()
         await refreshAgenda()
     }
 
@@ -72,21 +72,7 @@ final class CalendarStore: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        let days = await Task.detached { [eventStore] in
-            let enabledCalendars = CalendarSources.enabledEKCalendars(in: eventStore)
-            let calendar = Calendar.current
-            let start = calendar.startOfDay(for: now)
-            guard let end = calendar.date(byAdding: .day, value: targetHorizon, to: start)
-            else { return [CalendarAgendaDay]() }
-            if enabledCalendars?.isEmpty == true { return [CalendarAgendaDay]() }
-            let predicate = eventStore.predicateForEvents(
-                withStart: start,
-                end: end,
-                calendars: enabledCalendars)
-            let events = eventStore.events(matching: predicate)
-            return CalendarAgendaBuilder.buildAgenda(
-                from: events, now: now, offsetDays: 0, horizonDays: targetHorizon)
-        }.value
+        let days = await eventReader.agenda(now: now, horizonDays: targetHorizon)
 
         agenda = days
         fetchHorizonDays = targetHorizon
@@ -97,22 +83,7 @@ final class CalendarStore: ObservableObject {
 
     func currentEvent(at now: Date = .now, sourceApp: String? = nil) async -> CalendarEventSummary? {
         guard CalendarAuthorization.isAuthorized else { return nil }
-        return await Task.detached { [eventStore] in
-            let enabledCalendars = CalendarSources.enabledEKCalendars(in: eventStore)
-            if enabledCalendars?.isEmpty == true { return nil }
-            let archive = ArchivedEventStore()
-            let predicate = eventStore.predicateForEvents(
-                withStart: now.addingTimeInterval(-4 * 3600),
-                end: now.addingTimeInterval(10 * 60),
-                calendars: enabledCalendars)
-            let events = eventStore.events(matching: predicate)
-                .filter { !archive.isArchived(title: $0.title ?? "", eventID: $0.eventIdentifier ?? "") }
-            guard let selected = CalendarEventSelector.select(from: events, at: now, sourceApp: sourceApp)
-            else { return nil }
-            guard let mapped = CalendarAgendaBuilder.map(selected) else { return nil }
-            NutolaConsoleLog.calendar("current event → \"\(mapped.title)\" source=\(sourceApp ?? "none")")
-            return mapped
-        }.value
+        return await eventReader.currentEvent(at: now, sourceApp: sourceApp)
     }
 
     var nextUpcomingEvent: CalendarEventSummary? {
@@ -212,5 +183,47 @@ final class CalendarStore: ObservableObject {
                 self.objectWillChange.send()
             }
         }
+    }
+}
+
+/// Owns EventKit objects off the main actor; only value snapshots cross to the UI.
+private actor CalendarEventReader {
+    private var eventStore = EKEventStore()
+
+    func reset() {
+        eventStore = EKEventStore()
+    }
+
+    func agenda(now: Date, horizonDays: Int) -> [CalendarAgendaDay] {
+        let enabledCalendars = CalendarSources.enabledEKCalendars(in: eventStore)
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: now)
+        guard let end = calendar.date(byAdding: .day, value: horizonDays, to: start)
+        else { return [CalendarAgendaDay]() }
+        if enabledCalendars?.isEmpty == true { return [CalendarAgendaDay]() }
+        let predicate = eventStore.predicateForEvents(
+            withStart: start,
+            end: end,
+            calendars: enabledCalendars)
+        let events = eventStore.events(matching: predicate)
+        return CalendarAgendaBuilder.buildAgenda(
+            from: events, now: now, offsetDays: 0, horizonDays: horizonDays)
+    }
+
+    func currentEvent(at now: Date, sourceApp: String?) -> CalendarEventSummary? {
+        let enabledCalendars = CalendarSources.enabledEKCalendars(in: eventStore)
+        if enabledCalendars?.isEmpty == true { return nil }
+        let archive = ArchivedEventStore()
+        let predicate = eventStore.predicateForEvents(
+            withStart: now.addingTimeInterval(-4 * 3600),
+            end: now.addingTimeInterval(10 * 60),
+            calendars: enabledCalendars)
+        let events = eventStore.events(matching: predicate)
+            .filter { !archive.isArchived(title: $0.title ?? "", eventID: $0.eventIdentifier ?? "") }
+        guard let selected = CalendarEventSelector.select(from: events, at: now, sourceApp: sourceApp)
+        else { return nil }
+        guard let mapped = CalendarAgendaBuilder.map(selected) else { return nil }
+        NutolaConsoleLog.calendar("current event → \"\(mapped.title)\" source=\(sourceApp ?? "none")")
+        return mapped
     }
 }

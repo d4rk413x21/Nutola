@@ -173,6 +173,33 @@ final class StoreTests: XCTestCase {
         XCTAssertFalse(archive.restoreSummary(at: Date(timeIntervalSince1970: 0), for: m.id))
     }
 
+    func testSummaryTimestampsAdvancePastSavedHistoryAfterReopening() throws {
+        let m = makeMeeting()
+        try archive.save(m)
+        try archive.saveSummary("v1", for: m.id)
+        let edits = archive.folder(for: m.id).appendingPathComponent("Edits", isDirectory: true)
+        try FileManager.default.createDirectory(at: edits, withIntermediateDirectories: true)
+        // A persisted timestamp ahead of the clock makes collisions deterministic.
+        let futureMS: Int64 = 4_102_444_800_000
+        try Data("v0".utf8).write(to: edits.appendingPathComponent("summary-\(futureMS)-AAAA.md"))
+        try archive.saveSummary("v2", for: m.id)
+        XCTAssertEqual(archive.summaryHistory(for: m.id).first?.markdown, "v1")
+
+        archive = MeetingArchive(root: tmp)
+        try archive.saveSummary("v3", for: m.id)
+        let history = archive.summaryHistory(for: m.id)
+        XCTAssertEqual(history.map(\.markdown), ["v2", "v1", "v0"])
+        XCTAssertEqual(Set(history.map(\.timestamp)).count, history.count)
+        XCTAssertGreaterThan(try XCTUnwrap(history.first).timestamp.timeIntervalSince1970,
+                             TimeInterval(futureMS) / 1000)
+        let v1 = try XCTUnwrap(history.first { $0.markdown == "v1" })
+        XCTAssertTrue(archive.restoreSummary(at: v1.timestamp, for: m.id))
+        XCTAssertEqual(archive.summary(for: m.id), "v1")
+        let v3 = try XCTUnwrap(archive.summaryHistory(for: m.id).first { $0.markdown == "v3" })
+        XCTAssertTrue(archive.restoreSummary(at: v3.timestamp, for: m.id))
+        XCTAssertEqual(archive.summary(for: m.id), "v3")
+    }
+
     func testDeleteMeetingRemovesHistory() throws {
         let m = makeMeeting()
         try archive.save(m)

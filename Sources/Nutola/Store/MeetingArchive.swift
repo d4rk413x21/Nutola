@@ -338,8 +338,8 @@ final class MeetingArchive: @unchecked Sendable {
     }
 
     /// Writes a snapshot of the outgoing summary into `Edits/`, named with a
-    /// millisecond-epoch timestamp + a short nonce so multiple edits in the same
-    /// millisecond don't collide. Lexicographic filename order == chronological
+    /// strictly increasing millisecond-epoch timestamp + a short nonce, keeping
+    /// the existing filename format. Lexicographic filename order == chronological
     /// order, so pruning the oldest is just dropping the first N. Prunes to
     /// `maxSummaryHistory`, oldest first.
     private func snapshotSummary(_ markdown: String, for id: UUID) {
@@ -350,7 +350,13 @@ final class MeetingArchive: @unchecked Sendable {
             NutolaConsoleLog.app("snapshotSummary: could not create Edits dir — \(error.localizedDescription)")
             return
         }
-        let epochMS = Int64(Date().timeIntervalSince1970 * 1000)
+        // Restore identifies snapshots by timestamp, so every write must advance
+        // even within one millisecond, after reopening, or if the clock moves back.
+        let latestEpochMS = (try? FileManager.default.contentsOfDirectory(atPath: dir.path))?
+            .filter { $0.hasPrefix("summary-") && $0.hasSuffix(".md") }
+            .compactMap { Int64($0.dropFirst("summary-".count).split(separator: "-").first ?? "") }
+            .max() ?? 0
+        let epochMS = max(Int64(Date().timeIntervalSince1970 * 1000), latestEpochMS + 1)
         let nonce = String(UUID().uuidString.prefix(4))
         let name = "summary-\(epochMS)-\(nonce).md"
         let dest = dir.appendingPathComponent(name)
@@ -393,12 +399,8 @@ final class MeetingArchive: @unchecked Sendable {
             guard let files = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
                 .filter({ $0.lastPathComponent.hasPrefix("summary-") && $0.pathExtension == "md" })
             else { return [] }
-            // Lexicographic filename order == chronological write order (the
-            // epochMS prefix increments; the nonce only breaks ties within a
-            // millisecond). Reverse it for newest-first. This is fully
-            // deterministic even when two snapshots share the same millisecond,
-            // unlike a timestamp-only sort (Swift's sort isn't guaranteed
-            // stable for equal keys).
+            // New snapshots have increasing timestamps. The nonce provides a
+            // deterministic fallback for older snapshots sharing a millisecond.
             let chronological = files.sorted { $0.lastPathComponent < $1.lastPathComponent }
             return chronological.compactMap { file -> SummarySnapshot? in
                 let name = file.deletingPathExtension().lastPathComponent

@@ -101,12 +101,13 @@ struct ClaudeCLI {
     /// off the main thread.
     static func resolveBlocking() -> URL? {
         cacheLock.lock()
-        if let cached = cachedResolution {
+        if let cached = cachedResolution, let binary = cached,
+           FileManager.default.isExecutableFile(atPath: binary.path) {
             cacheLock.unlock()
-            return cached
+            return binary
         }
         cacheLock.unlock()
-        let found = fastProbe() ?? shellProbe()
+        let found = fastProbe() ?? shellProbe() ?? CLIExecutable.bundled("claude")
         cacheLock.lock()
         cachedResolution = .some(found)
         cacheLock.unlock()
@@ -120,8 +121,9 @@ struct ClaudeCLI {
         cacheLock.lock()
         let cached = cachedResolution
         cacheLock.unlock()
-        if let cached { return cached != nil }
-        return fastProbe() != nil
+        if let cached, let binary = cached,
+           FileManager.default.isExecutableFile(atPath: binary.path) { return true }
+        return fastProbe() != nil || CLIExecutable.bundled("claude") != nil
     }
 
     /// Shells out to `claude --version`. Call off the main thread; returns nil if

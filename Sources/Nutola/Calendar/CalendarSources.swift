@@ -28,9 +28,9 @@ enum CalendarSources {
             }
     }
 
-    static func enabledEKCalendars() -> [EKCalendar]? {
+    static func enabledEKCalendars(in store: EKEventStore) -> [EKCalendar]? {
         guard CalendarAuthorization.isAuthorized else { return [] }
-        let all = EKEventStore().calendars(for: .event)
+        let all = store.calendars(for: .event)
         let disabled = AppSettings.disabledCalendarIDs
         guard !disabled.isEmpty else { return nil }
         let enabled = all.filter { calendar in

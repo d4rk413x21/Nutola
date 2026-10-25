@@ -72,25 +72,23 @@ final class CalendarStore: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        let enabledCalendars = CalendarSources.enabledEKCalendars()
-        let events = await Task.detached { [eventStore, enabledCalendars] in
+        let days = await Task.detached { [eventStore] in
+            let enabledCalendars = CalendarSources.enabledEKCalendars(in: eventStore)
             let calendar = Calendar.current
             let start = calendar.startOfDay(for: now)
             guard let end = calendar.date(byAdding: .day, value: targetHorizon, to: start)
-            else { return [EKEvent]() }
-            if enabledCalendars?.isEmpty == true { return [EKEvent]() }
+            else { return [CalendarAgendaDay]() }
+            if enabledCalendars?.isEmpty == true { return [CalendarAgendaDay]() }
             let predicate = eventStore.predicateForEvents(
                 withStart: start,
                 end: end,
                 calendars: enabledCalendars)
-            return eventStore.events(matching: predicate)
+            let events = eventStore.events(matching: predicate)
+            return CalendarAgendaBuilder.buildAgenda(
+                from: events, now: now, offsetDays: 0, horizonDays: targetHorizon)
         }.value
 
-        agenda = CalendarAgendaBuilder.buildAgenda(
-            from: events,
-            now: now,
-            offsetDays: 0,
-            horizonDays: targetHorizon)
+        agenda = days
         fetchHorizonDays = targetHorizon
         lastRefresh = now
         let eventCount = agenda.reduce(0) { $0 + $1.events.count }
@@ -99,8 +97,8 @@ final class CalendarStore: ObservableObject {
 
     func currentEvent(at now: Date = .now, sourceApp: String? = nil) async -> CalendarEventSummary? {
         guard CalendarAuthorization.isAuthorized else { return nil }
-        let enabledCalendars = CalendarSources.enabledEKCalendars()
-        return await Task.detached { [eventStore, enabledCalendars] in
+        return await Task.detached { [eventStore] in
+            let enabledCalendars = CalendarSources.enabledEKCalendars(in: eventStore)
             if enabledCalendars?.isEmpty == true { return nil }
             let archive = ArchivedEventStore()
             let predicate = eventStore.predicateForEvents(

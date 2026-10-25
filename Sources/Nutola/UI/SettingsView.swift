@@ -5,29 +5,44 @@ import UserNotifications
 
 struct SettingsView: View {
     @AppStorage(SettingsKey.developerMode) private var developerMode = false
+    @State private var selection: SettingsSection = .general
+
+    private enum SettingsSection: Hashable {
+        case general, intelligence, transcription, templates, integrations, calendar, appearance, debug
+    }
 
     var body: some View {
-        TabView {
-            GeneralSettings()
-                .tabItem { Label("General", systemImage: "gearshape") }
-            IntelligenceSettings()
-                .tabItem { Label("Intelligence", systemImage: "sparkles") }
-            TranscriptionSettings()
-                .tabItem { Label("Transcription", systemImage: "waveform") }
-            TemplateSettings()
-                .tabItem { Label("Templates", systemImage: "doc.text") }
-            LinearSettings()
-                .tabItem { Label("Integrations", systemImage: "link") }
-            CalendarSettings()
-                .tabItem { Label("Calendar", systemImage: "calendar") }
-            AppearanceSettings()
-                .tabItem { Label("Appearance", systemImage: "paintbrush") }
+        TabView(selection: $selection) {
+            Tab("General", systemImage: "gearshape", value: SettingsSection.general) {
+                GeneralSettings()
+            }
+            Tab("Intelligence", systemImage: "sparkles", value: SettingsSection.intelligence) {
+                IntelligenceSettings()
+            }
+            Tab("Transcription", systemImage: "waveform", value: SettingsSection.transcription) {
+                TranscriptionSettings()
+            }
+            Tab("Templates", systemImage: "doc.text", value: SettingsSection.templates) {
+                TemplateSettings()
+            }
+            Tab("Integrations", systemImage: "link", value: SettingsSection.integrations) {
+                LinearSettings()
+            }
+            Tab("Calendar", systemImage: "calendar", value: SettingsSection.calendar) {
+                CalendarSettings()
+            }
+            Tab("Appearance", systemImage: "paintbrush", value: SettingsSection.appearance) {
+                AppearanceSettings()
+            }
             if developerMode {
-                DebugSettings()
-                    .tabItem { Label("Debug", systemImage: "ladybug") }
+                Tab("Debug", systemImage: "ladybug", value: SettingsSection.debug) {
+                    DebugSettings()
+                }
             }
         }
-        .frame(width: 560, height: 520)
+        .tabViewStyle(.sidebarAdaptable)
+        .frame(width: 800, height: 560)
+        .onChange(of: developerMode) { selection = .general }
     }
 }
 

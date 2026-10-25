@@ -160,11 +160,12 @@ final class DevelopmentTaskExtractorTests: XCTestCase {
 
     @MainActor
     func testMergeRetainsOriginalSourcesAndAppliesLaterRequirements() async throws {
+        let segments = twoParts
         var calls = 0
         let first = try response()
         let next = try response(evidence: [2])
         let result = try await DevelopmentTaskExtractor.extract(
-            meeting: meeting, transcript: twoParts, analyze: { instructions, _ in
+            meeting: meeting, transcript: segments, analyze: { instructions, _ in
                 calls += 1
                 if instructions == DevelopmentTaskExtractor.prompt { return calls == 1 ? first : next }
                 // The model omits the original source; the reducer must retain it.
@@ -172,7 +173,7 @@ final class DevelopmentTaskExtractorTests: XCTestCase {
             })
         XCTAssertEqual(result.tasks.count, 1)
         XCTAssertTrue(result.tasks[0].detail.contains("concurrent refreshes"))
-        XCTAssertEqual(result.tasks[0].evidence, twoParts)
+        XCTAssertEqual(result.tasks[0].evidence, segments)
     }
 
     @MainActor
@@ -250,6 +251,7 @@ final class DevelopmentTaskExtractorTests: XCTestCase {
     @MainActor
     func testReconciliationRejectsUnknownIDsAndUnseenEvidence() async throws {
         for reply in [
+            #"{"updates":[{"id":0,"merged":[],"evidence":[2]}]}"#,
             #"{"updates":[{"id":99,"task":null,"merged":[],"evidence":[2]}]}"#,
             #"{"updates":[{"id":0,"task":null,"merged":[],"evidence":[1]}]}"#,
             #"{"updates":[{"id":0,"task":null,"merged":[99],"evidence":[2]}]}"#,

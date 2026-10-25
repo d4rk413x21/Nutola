@@ -96,6 +96,17 @@ enum DevelopmentTaskExtractor {
         let task: Candidate?
         let merged: [Int]
         let evidence: [Int]
+
+        private enum CodingKeys: String, CodingKey { case id, task, merged, evidence }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            id = try values.decode(Int.self, forKey: .id)
+            // A missing field must not be interpreted as an explicit cancellation.
+            task = try values.decode(Candidate?.self, forKey: .task)
+            merged = try values.decode([Int].self, forKey: .merged)
+            evidence = try values.decode([Int].self, forKey: .evidence)
+        }
     }
 
     private struct Changes: Decodable {

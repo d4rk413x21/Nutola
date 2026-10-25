@@ -630,7 +630,7 @@ struct GranolaFloatingPanel: View {
     // Mirrors AILauncherView.submit: "Answer here" (CLI) streams in-app via the
     // Ask sheet; "Open in app" deep-links the external assistant. Apple
     // Intelligence is always CLI (on-device), so it routes through the sheet too.
-    let effectiveMode: AskDeliveryMode = preferredAIProvider == .apple ? .cli : askDeliveryMode
+    let effectiveMode: AskDeliveryMode = preferredAIProvider.supportsApp ? askDeliveryMode : .cli
     switch effectiveMode {
     case .cli:
       askSheetQuestion = question
@@ -638,7 +638,7 @@ struct GranolaFloatingPanel: View {
     case .app:
       let prompt: String
       switch preferredAIProvider {
-      case .apple:
+      case .apple, .opencode, .vibe:
         return
       case .claude:
         prompt = ClaudeDesktopPrompt.meeting(

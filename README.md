@@ -10,8 +10,8 @@
 An open-source, on-device meeting notetaker for macOS — a lightweight alternative to Granola.<br>
 It lives in your menu bar, notices when a meeting starts, records both sides of the call,<br>
 and writes a transcript with named speakers plus templated notes — without audio ever leaving your Mac.<br>
-Then it hands any meeting to <strong>your assistant</strong> — Apple Intelligence, Claude, or Codex — through a
-built-in MCP server: one call, your whole history, or the meeting happening <em>right now</em>, with nothing uploaded.
+Then it hands meeting text to <strong>your assistant</strong> — Apple Intelligence, Claude, Codex, OpenCode,
+or Mistral Vibe — through on-device analysis, your configured CLI, or the built-in MCP server.
 </p>
 
 ---
@@ -70,9 +70,9 @@ Nutola has no backend, no accounts, and no API keys. It composes things your Mac
 | System-audio capture | Core Audio process taps (macOS 14.4+) |
 | Transcription | SpeechAnalyzer / SpeechTranscriber (macOS 26, on device) |
 | Speaker separation | FluidAudio CoreML diarization (on device) |
-| Summaries, titles | Apple Intelligence FoundationModels (on device) |
-| Long meetings, publishing | **Your own** Claude or Codex account via the `claude` / `codex` CLI |
-| Ask (per-meeting, cross-meeting, live) | **Apple Intelligence** in-app, or **your own** Claude / Codex (CLI or desktop app) via Nutola's MCP connector |
+| Summaries, titles | Apple Intelligence FoundationModels (on device), or your selected CLI assistant |
+| Long meeting summaries | **Your own** Claude, Codex, OpenCode, or Mistral Vibe CLI configuration |
+| Ask (per-meeting, cross-meeting, live) | **Apple Intelligence** or your selected CLI in-app; Claude / Codex also support desktop handoff |
 | Calendar | EventKit (on device) |
 | Publish target | **Your own** GitHub via `gh` (secret gist), served back rendered by the bundled notes-proxy worker, or a local browser preview / HTML export |
 
@@ -86,9 +86,23 @@ Nutola has no backend, no accounts, and no API keys. It composes things your Mac
   long-meeting summaries, billed to your own plan
 - **Optional — Codex:** [Codex](https://chatgpt.com/codex) (`codex` CLI, logged in) — same as
   Claude, through your own account
+- **Optional — OpenCode:** [OpenCode](https://opencode.ai/docs/) (`opencode` CLI), configured
+  with your preferred account and model
+- **Optional — Mistral Vibe:** [Mistral Vibe](https://github.com/mistralai/mistral-vibe)
+  (`vibe` CLI), with its account and model configured
 - **Optional:** [GitHub CLI](https://cli.github.com) (`gh auth login`) — to publish a shareable
   rendered URL as a gist on your own account (without it, you can still preview and export the
   HTML locally)
+
+Claude and Codex executables bundled with VS Code and VS Code Insiders are also detected under
+`~/.vscode/extensions` and `~/.vscode-insiders/extensions`. Nutola chooses the newest executable
+bundle compatible with the Mac's architecture when a standalone install is not found. The
+resolved executable is used for requests, version checks, and account checks.
+
+For OpenCode or Mistral Vibe, run `opencode` or `vibe` in Terminal once to finish account/model
+setup, then select it in **Settings → Intelligence**. These providers answer inside Nutola;
+meeting text is included directly, so no Nutola MCP connector is required. The installed status
+indicates that the executable was found; authentication/model errors are reported on requests.
 
 ## Install
 
@@ -199,7 +213,7 @@ model; prose under a heading tells it what belongs there. Placeholders: `{{title
 - Audio, transcripts, and notes never leave your Mac by default.
 - The only network calls Nutola itself makes: one-time model downloads (Apple speech assets via
   the OS; the diarization model from Hugging Face).
-- Anything involving Claude, Codex, or GitHub happens through **your** already-authenticated
+- Anything involving Claude, Codex, OpenCode, Mistral Vibe, or GitHub happens through **your** configured
   CLIs, at your explicit request (chat, publish, or when a meeting exceeds the on-device model),
   on your own accounts.
 - Publishing is always an explicit action. "Secret" gists are unlisted (on your own account,
@@ -208,8 +222,8 @@ model; prose under a heading tells it what belongs there. Placeholders: `{{title
 
 ## Development task drafts
 
-Open a processed meeting and choose **Development tasks**. Select your signed-in Claude or
-Codex CLI, then **Extract tasks**. The full saved transcript is analyzed in parts; later parts
+Open a processed meeting and choose **Development tasks**. Select Claude, Codex, OpenCode,
+or Mistral Vibe CLI, then **Extract tasks**. The full saved transcript is analyzed in parts; later parts
 can refine or cancel earlier requests. Each draft includes editable text, an optional owner,
 and original transcript passages with speaker names and timestamps. Unassigned work stays
 unassigned.
@@ -222,7 +236,8 @@ it does not create Linear issues.
 
 Extraction sends the transcript through the selected CLI account. Claude runs without tools;
 Codex uses an isolated read-only invocation without user configuration, connectors, or shell
-tools. A recent Codex CLI supporting `--ignore-user-config` is required. No API key is added
+tools. OpenCode uses a dedicated analysis agent with tools denied; Vibe disables tools for the
+headless request. Both reuse the CLI's configured model and account. A recent Codex CLI supporting `--ignore-user-config` is required. No API key is added
 to Nutola.
 
 ## Development

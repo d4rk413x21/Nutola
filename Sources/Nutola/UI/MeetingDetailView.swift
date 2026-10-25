@@ -373,6 +373,8 @@ struct MeetingDetailView: View {
         switch provider {
         case "claude": label = "Claude"
         case "codex": label = "Codex"
+        case "opencode": label = "OpenCode"
+        case "vibe": label = "Mistral Vibe"
         case "apple": label = "Apple Intelligence"
         default: label = provider
         }

@@ -487,6 +487,7 @@ enum ProcessingPipeline {
         }
         var claudeError: String?
         var codexError: String?
+        var agentError: String?
         func claude() async -> SummaryOutcome? {
             guard ClaudeCLI.isInstalled else { return nil }
             do {
@@ -532,6 +533,21 @@ enum ProcessingPipeline {
             }
         }
 
+        func agent(_ provider: AIProvider) async -> SummaryOutcome? {
+            guard AgentCLI.isInstalled(provider) else { return nil }
+            do {
+                let text = try await AgentCLI.run(provider: provider, prompt: prompt, stdin: transcript, systemPrompt: systemPrompt)
+                if let onDelta { onDelta(text) }
+                TokenUsageTracker.shared.record(
+                    promptTokens: estimateTokens(prompt + transcript), completionTokens: estimateTokens(text))
+                return .success(text, provider: provider.rawValue)
+            } catch {
+                agentError = error.localizedDescription
+                NutolaConsoleLog.intelligence("\(provider.displayName): \(error.localizedDescription)")
+                return nil
+            }
+        }
+
         if let forceProvider {
             let name = forceProvider.displayName
             let engine: () async -> SummaryOutcome?
@@ -539,6 +555,7 @@ enum ProcessingPipeline {
             case .apple: engine = apple
             case .claude: engine = claude
             case .codex: engine = codex
+            case .opencode, .vibe: engine = { await agent(forceProvider) }
             }
             NutolaConsoleLog.intelligence("summarize: forced \(name)")
             if let outcome = await engine() {
@@ -561,17 +578,21 @@ enum ProcessingPipeline {
                     return .failure("Summary failed via Codex: \(codexError)")
                 }
                 return .failure("Codex isn't ready — install the CLI and sign in, then try again.")
+            case .opencode, .vibe:
+                return .failure(agentError.map { "Summary failed via \(name): \($0)" }
+                    ?? "\(name) isn't ready — install and configure its CLI, then try again.")
             }
         }
 
         let preferred = AppSettings.preferredAIProvider
-        let cloudPrimary: () async -> SummaryOutcome? = preferred == .codex ? codex : claude
+        let cloudPrimary: () async -> SummaryOutcome?
+        if preferred == .opencode || preferred == .vibe {
+            cloudPrimary = { await agent(preferred) }
+        } else {
+            cloudPrimary = preferred == .codex ? codex : claude
+        }
         let cloudFallback: () async -> SummaryOutcome? = preferred == .codex ? claude : codex
-        let cloudReady = preferred == .codex
-            ? CodexCLI.isReady
-            : preferred == .claude
-                ? ClaudeCLI.isInstalled && ClaudeCLI.isLoggedIn()
-                : false
+        let cloudReady = preferred.isCloud && preferred.isAvailableForSummary
 
         let order: [() async -> SummaryOutcome?]
         let orderNames: [String]
@@ -579,7 +600,7 @@ enum ProcessingPipeline {
         case .apple:
             order = [apple, claude, codex]
             orderNames = ["Apple Intelligence", "Claude", "Codex"]
-        case .claude, .codex:
+        case .claude, .codex, .opencode, .vibe:
             let primary = preferred.displayName
             let fallback = preferred == .codex ? "Claude" : "Codex"
             if cloudReady {
@@ -622,6 +643,9 @@ enum ProcessingPipeline {
             NutolaConsoleLog.intelligence("summarize: failed via Codex — \(codexError)")
             return .failure("Summary failed via Codex: \(codexError)")
         }
+        if let agentError, preferred == .opencode || preferred == .vibe {
+            return .failure("Summary failed via \(preferred.displayName): \(agentError)")
+        }
         if let claudeError {
             NutolaConsoleLog.intelligence("summarize: failed via Claude — \(claudeError)")
             return .failure("Summary failed via Claude: \(claudeError)")
@@ -644,6 +668,14 @@ enum ProcessingPipeline {
             TokenUsageTracker.shared.record(
                 promptTokens: estimateTokens(summary), completionTokens: estimateTokens(title))
             return cleaned(title)
+        }
+        if let selected = AIProvider(rawValue: provider), selected == .opencode || selected == .vibe,
+           let text = try? await AgentCLI.run(
+               provider: selected,
+               prompt: "Reply with only a specific 3–8 word title for the meeting with these notes, no quotes:\n\n\(String(summary.prefix(maxTitleSourceChars)))") {
+            TokenUsageTracker.shared.record(
+                promptTokens: estimateTokens(summary), completionTokens: estimateTokens(text))
+            return cleaned(text)
         }
         if provider == "codex", CodexCLI.isInstalled,
            let result = try? await CodexCLI.run(

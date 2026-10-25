@@ -8,7 +8,7 @@ enum AIAsk {
     static var isAvailable: Bool {
         switch provider {
         case .apple: return AppleSummarizer.isAvailable
-        case .claude, .codex: return isAvailable(for: deliveryMode)
+        case .claude, .codex, .opencode, .vibe: return isAvailable(for: deliveryMode)
         }
     }
 
@@ -30,6 +30,8 @@ enum AIAsk {
             case .app: return CodexApp.isInstalled
             case .cli: return CodexCLI.isReady
             }
+        case .opencode, .vibe:
+            return mode == .cli && AgentCLI.isInstalled(provider)
         }
     }
 
@@ -38,7 +40,7 @@ enum AIAsk {
     @discardableResult
     static func open(prompt: String) -> Bool {
         switch provider {
-        case .apple: false
+        case .apple, .opencode, .vibe: false
         case .claude: ClaudeDesktop.openNewChat(prompt: prompt)
         case .codex: CodexApp.openNewThread(prompt: prompt)
         }
@@ -49,6 +51,7 @@ enum AIAsk {
         case .apple: break
         case .claude: ClaudeCLI.cancelRunning()
         case .codex: CodexCLI.cancelRunning()
+        case .opencode, .vibe: break // Their subprocesses are stopped by the owning Task's cancellation handler.
         }
     }
 
@@ -85,6 +88,9 @@ enum AIAsk {
                 systemPrompt: systemPrompt
             )
             result = run.text
+        case .opencode, .vibe:
+            result = try await AgentCLI.run(
+                provider: provider, prompt: AskContextBuilder.enrichForCLI(prompt), systemPrompt: systemPrompt)
         }
         TokenUsageTracker.shared.record(
             promptTokens: Self.estimateTokens(prompt),
@@ -104,7 +110,7 @@ enum AIAsk {
     static func openMeeting(id: UUID, title: String, question: String) -> Bool {
         NutolaConsoleLog.ask("openMeeting \"\(title)\" via \(provider.displayName)")
         switch provider {
-        case .apple: return false
+        case .apple, .opencode, .vibe: return false
         case .claude:
             return ClaudeDesktop.openNewChat(
                 prompt: ClaudeDesktopPrompt.meeting(id: id, title: title, question: question))
@@ -116,7 +122,7 @@ enum AIAsk {
     @discardableResult
     static func openLibrary(question: String) -> Bool {
         switch provider {
-        case .apple: false
+        case .apple, .opencode, .vibe: false
         case .claude: ClaudeDesktop.openNewChat(prompt: ClaudeDesktopPrompt.library(question: question))
         case .codex: CodexApp.openNewThread(prompt: CodexPrompt.library(question: question))
         }
@@ -125,7 +131,7 @@ enum AIAsk {
     @discardableResult
     static func openLive(question: String = "") -> Bool {
         switch provider {
-        case .apple: false
+        case .apple, .opencode, .vibe: false
         case .claude: ClaudeDesktop.openNewChat(prompt: ClaudeDesktopPrompt.live(question: question))
         case .codex: CodexApp.openNewThread(prompt: CodexPrompt.live(question: question))
         }

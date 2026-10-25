@@ -43,8 +43,9 @@ struct DevelopmentTasksSheet: View {
 
             HStack {
                 Picker("Analyze with", selection: $provider) {
-                    Text("Claude CLI").tag(AIProvider.claude)
-                    Text("Codex CLI").tag(AIProvider.codex)
+                    ForEach(AIProvider.allCases.filter(\.isCloud)) { provider in
+                        Text("\(provider.displayName) CLI").tag(provider)
+                    }
                 }
                 .frame(width: 240)
                 .disabled(isExtracting)

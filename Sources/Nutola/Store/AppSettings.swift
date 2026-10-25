@@ -17,7 +17,7 @@ enum SettingsKey {
     static let didCompleteOnboarding = "didCompleteOnboarding" // first-run walkthrough finished
     static let systemAudioConfirmed = "systemAudioConfirmed"   // tap has captured real (non-silent) audio at least once
     static let preferClaudeSummaries = "preferClaudeSummaries" // prefer cloud AI for summaries first (vs. Apple-first)
-    static let preferredAIProvider = "preferredAIProvider"     // apple | claude | codex
+    static let preferredAIProvider = "preferredAIProvider"     // apple | claude | codex | opencode | vibe
     static let askDeliveryMode = "askDeliveryMode"             // cli | app
     static let askMaxTurns = "askMaxTurns"                     // MCP tool rounds for CLI ask
     static let appearanceMode = "appearanceMode"               // system | light | dark
@@ -73,6 +73,8 @@ enum AIProvider: String, CaseIterable, Identifiable, Hashable {
     case apple
     case claude
     case codex
+    case opencode
+    case vibe
 
     var id: String { rawValue }
 
@@ -81,19 +83,24 @@ enum AIProvider: String, CaseIterable, Identifiable, Hashable {
         case .apple: "Apple Intelligence"
         case .claude: "Claude"
         case .codex: "Codex"
+        case .opencode: "OpenCode"
+        case .vibe: "Mistral Vibe"
         }
     }
 
     var isCloud: Bool { self != .apple }
+    var supportsApp: Bool { self == .claude || self == .codex }
+    var deliveryModes: [AskDeliveryMode] { supportsApp ? AskDeliveryMode.allCases : [.cli] }
 
     /// Assistants that can answer questions about meetings in-app.
-    static let askChoices: [AIProvider] = [.apple, .claude, .codex]
+    static let askChoices: [AIProvider] = allCases
 
     var isAvailableForSummary: Bool {
         switch self {
         case .apple: AppleSummarizer.isAvailable
         case .claude: ClaudeCLI.isInstalled && ClaudeCLI.isLoggedIn()
         case .codex: CodexCLI.isReady
+        case .opencode, .vibe: AgentCLI.isInstalled(self)
         }
     }
 }
@@ -208,7 +215,8 @@ enum AppSettings {
         AIProvider(rawValue: defaults.string(forKey: SettingsKey.preferredAIProvider) ?? "") ?? .apple
     }
     static var askDeliveryMode: AskDeliveryMode {
-        AskDeliveryMode(rawValue: defaults.string(forKey: SettingsKey.askDeliveryMode) ?? "") ?? .cli
+        guard preferredAIProvider.supportsApp else { return .cli }
+        return AskDeliveryMode(rawValue: defaults.string(forKey: SettingsKey.askDeliveryMode) ?? "") ?? .cli
     }
     static var askMaxTurns: Int {
         let value = defaults.integer(forKey: SettingsKey.askMaxTurns)

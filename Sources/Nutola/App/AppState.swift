@@ -200,6 +200,8 @@ final class AppState: NSObject, ObservableObject {
     Task.detached {
       _ = ClaudeCLI.resolveBlocking()
       _ = CodexCLI.resolveBlocking()
+      _ = AgentCLI.resolveBlocking(.opencode)
+      _ = AgentCLI.resolveBlocking(.vibe)
       ClaudeCLI.warmAuthCache()
       CodexCLI.warmAuthCache()
       await MainActor.run {

@@ -17,7 +17,7 @@ struct MeetingLauncherView: View {
             initialQuestion: initialQuestion,
             promptBuilder: { question in
                 switch AppSettings.preferredAIProvider {
-                case .apple:
+                case .apple, .opencode, .vibe:
                     ClaudeDesktopPrompt.meeting(
                         id: meeting.id, title: meeting.title, question: question)
                 case .claude:
@@ -51,7 +51,7 @@ struct LibraryLauncherView: View {
             recentMeetings: recentMeetings,
             promptBuilder: { question in
                 switch AppSettings.preferredAIProvider {
-                case .apple, .claude:
+                case .apple, .claude, .opencode, .vibe:
                     ClaudeDesktopPrompt.library(question: question)
                 case .codex:
                     CodexPrompt.library(question: question)
@@ -59,7 +59,7 @@ struct LibraryLauncherView: View {
             },
             meetingPromptBuilder: { meeting, question in
                 switch AppSettings.preferredAIProvider {
-                case .apple, .claude:
+                case .apple, .claude, .opencode, .vibe:
                     ClaudeDesktopPrompt.meeting(
                         id: meeting.id, title: meeting.title, question: question)
                 case .codex:
@@ -109,6 +109,10 @@ struct AILauncherView: View {
 
     private var isConversationMode: Bool {
         !messages.isEmpty
+    }
+
+    private var effectiveMode: AskDeliveryMode {
+        preferredAIProvider.supportsApp ? askDeliveryMode : .cli
     }
 
     var body: some View {
@@ -216,7 +220,7 @@ struct AILauncherView: View {
 
     private func refreshAvailability() {
         let provider = preferredAIProvider
-        let mode = askDeliveryMode
+        let mode = effectiveMode
         Task.detached {
             var byMode: [AskDeliveryMode: Bool] = [:]
             for deliveryMode in AskDeliveryMode.allCases {
@@ -338,11 +342,11 @@ struct AILauncherView: View {
                 }
             }
             Section("How to answer") {
-                ForEach(AskDeliveryMode.allCases) { mode in
+                ForEach(preferredAIProvider.deliveryModes) { mode in
                     Button {
                         askDeliveryMode = mode
                     } label: {
-                        if askDeliveryMode == mode {
+                        if effectiveMode == mode {
                             Label(mode.displayName, systemImage: "checkmark")
                         } else {
                             Text(mode.displayName)
@@ -389,6 +393,7 @@ struct AILauncherView: View {
     private var badgeIcon: String {
         switch preferredAIProvider {
         case .apple: "apple.intelligence"
+        case .opencode, .vibe: "terminal"
         case .codex where askDeliveryMode == .cli: "terminal"
         case .claude where askDeliveryMode == .cli: "terminal"
         default: "sparkles"
@@ -399,8 +404,8 @@ struct AILauncherView: View {
         switch preferredAIProvider {
         case .apple:
             return "Apple Intelligence"
-        case .claude, .codex:
-            if askDeliveryMode == .cli {
+        case .claude, .codex, .opencode, .vibe:
+            if effectiveMode == .cli {
                 return "\(preferredAIProvider.displayName) · CLI"
             }
             return preferredAIProvider.displayName
@@ -440,8 +445,8 @@ struct AILauncherView: View {
     private var submitHelp: String {
         switch preferredAIProvider {
         case .apple: "Answer with Apple Intelligence"
-        case .claude, .codex:
-            switch askDeliveryMode {
+        case .claude, .codex, .opencode, .vibe:
+            switch effectiveMode {
             case .cli: "Answer with \(preferredAIProvider.displayName) CLI"
             case .app: "Open in \(preferredAIProvider.displayName)"
             }
@@ -565,7 +570,7 @@ struct AILauncherView: View {
             Text("Answers run on-device with your meeting summaries embedded in the prompt.")
                 .font(.nutola(11))
                 .foregroundStyle(Theme.tertiary(scheme))
-        } else if askDeliveryMode == .app {
+        } else if effectiveMode == .app {
             Text(
                 "Tip: once the nutola connector is set up, open \(preferredAIProvider.displayName) anytime — use $nutola to attach the connector."
             )
@@ -573,7 +578,7 @@ struct AILauncherView: View {
             .foregroundStyle(Theme.tertiary(scheme))
         } else {
             Text(
-                "Answers run through the \(preferredAIProvider.displayName) CLI with the nutola connector. Tap the badge to switch assistants or open in the app instead."
+                "Answers run through the \(preferredAIProvider.displayName) CLI with meeting data included in the prompt. Tap the badge to switch assistants."
             )
             .font(.nutola(11))
             .foregroundStyle(Theme.tertiary(scheme))
@@ -583,8 +588,8 @@ struct AILauncherView: View {
     private var failureMessage: String {
         switch preferredAIProvider {
         case .apple: "Couldn't get an answer from Apple Intelligence."
-        case .claude, .codex:
-            switch askDeliveryMode {
+        case .claude, .codex, .opencode, .vibe:
+            switch effectiveMode {
             case .app: "Couldn't open \(preferredAIProvider.displayName)."
             case .cli: "Couldn't get an answer from \(preferredAIProvider.displayName)."
             }
@@ -599,7 +604,7 @@ struct AILauncherView: View {
                 Label("Apple Intelligence unavailable", systemImage: "exclamationmark.triangle")
                     .font(.nutola(12, .semibold))
                     .foregroundStyle(.orange)
-                Text(AppleSummarizer.unavailableReason ?? "Turn on Apple Intelligence in System Settings, or pick Claude or Codex from the badge.")
+                Text(AppleSummarizer.unavailableReason ?? "Turn on Apple Intelligence in System Settings, or pick a CLI assistant from the badge.")
                     .font(.nutola(11))
                     .foregroundStyle(Theme.secondary(scheme))
             }
@@ -623,6 +628,12 @@ struct AILauncherView: View {
                 linkTitle: "Get Codex",
                 linkURL: URL(string: "https://chatgpt.com/codex")!
             )
+        case .opencode, .vibe:
+            cliUnavailableNotice(
+                title: "\(preferredAIProvider.displayName) CLI isn't installed",
+                linkTitle: "Get \(preferredAIProvider.displayName)",
+                linkURL: URL(string: preferredAIProvider == .opencode
+                    ? "https://opencode.ai/docs/" : "https://github.com/mistralai/mistral-vibe")!)
         }
     }
 
@@ -633,7 +644,7 @@ struct AILauncherView: View {
                 .foregroundStyle(.orange)
             HStack(spacing: 4) {
                 Link(linkTitle, destination: linkURL)
-                Text("— then add the nutola connector in Settings.")
+                Text("— then configure the CLI and select it in Settings.")
                     .foregroundStyle(Theme.secondary(scheme))
             }
             .font(.nutola(11))
@@ -659,7 +670,7 @@ struct AILauncherView: View {
         launchFailed = false
         messages.append(AskChatMessage(role: .user, text: displayText))
 
-        switch preferredAIProvider == .apple ? AskDeliveryMode.cli : askDeliveryMode {
+        switch effectiveMode {
         case .app:
             launchFailed = !AIAsk.open(prompt: prompt)
             if !launchFailed { input = "" }

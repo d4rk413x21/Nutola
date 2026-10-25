@@ -561,6 +561,7 @@ private struct IntelligenceSettings: View {
     @State private var codexSetupAvailable = false
     @State private var claudeVersion: String?
     @State private var codexVersion: String?
+    @State private var additionalInstalled: [AIProvider: Bool] = [:]
     @AppStorage(SettingsKey.preferClaudeSummaries) private var preferClaudeSummaries = false
     @AppStorage(SettingsKey.preferredAIProvider) private var preferredAIProvider: AIProvider = .apple
     @AppStorage(SettingsKey.askDeliveryMode) private var askDeliveryMode: AskDeliveryMode = .cli
@@ -576,6 +577,7 @@ private struct IntelligenceSettings: View {
         case .apple: AppleSummarizer.isAvailable
         case .claude: claudeInstalled && claudeLoggedIn
         case .codex: codexInstalled && codexLoggedIn
+        case .opencode, .vibe: additionalInstalled[preferredAIProvider] == true
         }
     }
 
@@ -642,16 +644,22 @@ private struct IntelligenceSettings: View {
                     .foregroundStyle(.secondary)
 
                 if preferredAIProvider.isCloud {
-                    Picker("Answer with", selection: $askDeliveryMode) {
-                        ForEach(AskDeliveryMode.allCases) { mode in
-                            Text(mode.displayName).tag(mode)
+                    if preferredAIProvider.supportsApp {
+                        Picker("Answer with", selection: $askDeliveryMode) {
+                            ForEach(preferredAIProvider.deliveryModes) { mode in
+                                Text(mode.displayName).tag(mode)
+                            }
                         }
+                        Text(askDeliveryMode.detail)
+                            .font(.nutola(11))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Answers are shown here using your CLI's configured account and model.")
+                            .font(.nutola(11))
+                            .foregroundStyle(.secondary)
                     }
-                    Text(askDeliveryMode.detail)
-                        .font(.nutola(11))
-                        .foregroundStyle(.secondary)
 
-                    if askDeliveryMode == .cli {
+                    if preferredAIProvider.supportsApp && askDeliveryMode == .cli {
                         Stepper("Context rounds: \(askMaxTurns)", value: $askMaxTurns, in: 3...15)
                         Text("How many tool rounds the CLI can use to search and read meetings. Raise this for long transcripts.")
                             .font(.nutola(11))
@@ -683,10 +691,17 @@ private struct IntelligenceSettings: View {
                         detail: aiProviderStatusDescription(
                             provider: .claude, installed: claudeInstalled, loggedIn: claudeLoggedIn,
                             forDetail: true))
+                case .opencode, .vibe:
+                    statusRow(
+                        ok: additionalInstalled[preferredAIProvider] == true,
+                        title: aiProviderStatusDescription(provider: preferredAIProvider,
+                            installed: additionalInstalled[preferredAIProvider] == true, loggedIn: false),
+                        detail: aiProviderStatusDescription(provider: preferredAIProvider,
+                            installed: additionalInstalled[preferredAIProvider] == true, loggedIn: false, forDetail: true))
                 }
             }
 
-            if preferredAIProvider.isCloud {
+            if preferredAIProvider.supportsApp {
                 Section("Connect \(preferredAIProvider.displayName) to your meetings") {
                     connectAIContent
                 }
@@ -718,11 +733,17 @@ private struct IntelligenceSettings: View {
                 let codexIn = CodexCLI.isLoggedIn()
                 let claudeV = ClaudeCLI.version()
                 let codexV = CodexCLI.version()
+                var installed: [AIProvider: Bool] = [:]
+                for provider in [AIProvider.opencode, .vibe] {
+                    installed[provider] = AgentCLI.resolveBlocking(provider) != nil
+                }
+                let additional = installed
                 await MainActor.run {
                     claudeLoggedIn = loggedIn
                     codexLoggedIn = codexIn
                     claudeVersion = claudeV
                     codexVersion = codexV
+                    additionalInstalled = additional
                     logAssistantStatus()
                 }
             }
@@ -790,6 +811,12 @@ private struct IntelligenceSettings: View {
             return forDetail
                 ? "Ask about your meetings from Codex once the nutola connector is set up."
                 : "Codex CLI — connected"
+        case .opencode, .vibe:
+            if forDetail {
+                let command = provider == .opencode ? "opencode" : "vibe"
+                return "Run `\(command)` in Terminal to configure its account and model. Nutola uses that configuration; account errors are reported when a request runs."
+            }
+            return "\(provider.displayName) CLI — \(installed ? "installed" : "not installed")"
         }
     }
 
@@ -831,7 +858,7 @@ private struct IntelligenceSettings: View {
     @ViewBuilder
     private var connectAIContent: some View {
         switch preferredAIProvider {
-        case .apple:
+        case .apple, .opencode, .vibe:
             EmptyView()
         case .claude:
             VStack(alignment: .leading, spacing: 8) {

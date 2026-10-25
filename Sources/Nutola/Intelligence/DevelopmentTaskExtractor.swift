@@ -52,7 +52,7 @@ enum DevelopmentTaskError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noTranscript: "This meeting has no saved transcript to analyze."
-        case .unsupportedProvider: "Choose Claude or Codex CLI to extract development tasks."
+        case .unsupportedProvider: "Choose a CLI assistant to extract development tasks."
         case .invalidResponse: "The assistant did not return valid task drafts. Your saved drafts have not changed."
         case .invalidEvidence: "A draft cited missing transcript passages or an unsupported owner. Your saved drafts have not changed."
         case .transcriptChanged: "The transcript changed during analysis. Extract again from the updated transcript."
@@ -181,6 +181,8 @@ enum DevelopmentTaskExtractor {
             return try await ClaudeCLI.run(prompt: prompt, stdin: input).text
         case .codex:
             return try await CodexCLI.run(prompt: prompt, stdin: input, analysisOnly: true).text
+        case .opencode, .vibe:
+            return try await AgentCLI.run(provider: provider, prompt: prompt, stdin: input)
         case .apple:
             throw DevelopmentTaskError.unsupportedProvider
         }

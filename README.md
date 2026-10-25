@@ -62,7 +62,8 @@ or Mistral Vibe — through on-device analysis, your configured CLI, or the buil
 
 ## The stack is the feature
 
-Nutola has no backend, no accounts, and no API keys. It composes things your Mac already has:
+Nutola has no backend or mandatory account. On-device features need no API keys;
+optional Linear export uses your own key. It composes things your Mac already has:
 
 | Need | Provider |
 |---|---|
@@ -74,6 +75,7 @@ Nutola has no backend, no accounts, and no API keys. It composes things your Mac
 | Long meeting summaries | **Your own** Claude, Codex, OpenCode, or Mistral Vibe CLI configuration |
 | Ask (per-meeting, cross-meeting, live) | **Apple Intelligence** or your selected CLI in-app; Claude / Codex also support desktop handoff |
 | Calendar | EventKit (on device) |
+| Development issue creation | Your own Linear workspace via its GraphQL API; optional personal key in the macOS Keychain |
 | Publish target | **Your own** GitHub via `gh` (secret gist), served back rendered by the bundled notes-proxy worker, or a local browser preview / HTML export |
 
 ## Requirements
@@ -90,6 +92,7 @@ Nutola has no backend, no accounts, and no API keys. It composes things your Mac
   with your preferred account and model
 - **Optional — Mistral Vibe:** [Mistral Vibe](https://github.com/mistralai/mistral-vibe)
   (`vibe` CLI), with its account and model configured
+- **Optional — Linear:** a personal API key configured in Settings → Integrations
 - **Optional:** [GitHub CLI](https://cli.github.com) (`gh auth login`) — to publish a shareable
   rendered URL as a gist on your own account (without it, you can still preview and export the
   HTML locally)
@@ -211,8 +214,11 @@ model; prose under a heading tells it what belongs there. Placeholders: `{{title
 ## Privacy model
 
 - Audio, transcripts, and notes never leave your Mac by default.
-- The only network calls Nutola itself makes: one-time model downloads (Apple speech assets via
-  the OS; the diarization model from Hugging Face).
+- Model downloads use Apple speech assets via the OS and the diarization model from Hugging Face.
+- The optional Linear integration calls `api.linear.app` directly. Connecting and opening
+  Development tasks loads workspace/team metadata; selecting a team loads its projects.
+  Creating issues sends only selected draft descriptions and their quoted transcript passages.
+  The personal API key stays in the macOS login Keychain and is used only for Linear requests.
 - Anything involving Claude, Codex, OpenCode, Mistral Vibe, or GitHub happens through **your** configured
   CLIs, at your explicit request (chat, publish, or when a meeting exceeds the on-device model),
   on your own accounts.
@@ -250,8 +256,8 @@ retaining created issues and local links. Concurrent stale draft saves are rejec
 Extraction sends the transcript through the selected CLI account. Claude runs without tools;
 Codex uses an isolated read-only invocation without user configuration, connectors, or shell
 tools. OpenCode uses a dedicated analysis agent with tools denied; Vibe disables tools for the
-headless request. Both reuse the CLI's configured model and account. A recent Codex CLI supporting `--ignore-user-config` is required. No API key is added
-to Nutola.
+headless request. Both reuse the CLI's configured model and account. A recent Codex CLI supporting
+`--ignore-user-config` is required. No AI provider API key is added to Nutola.
 
 ## Development
 

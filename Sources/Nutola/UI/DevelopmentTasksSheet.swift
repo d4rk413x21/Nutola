@@ -130,6 +130,7 @@ struct DevelopmentTasksSheet: View {
         .task { load(); await loadLinear() }
         .task(id: teamID) { await loadProjects() }
         .onReceive(NotificationCenter.default.publisher(for: LinearCredentials.changed)) { _ in
+            publication?.cancel()
             linearClient = nil
             workspace = nil
             Task { await loadLinear() }
@@ -240,7 +241,11 @@ struct DevelopmentTasksSheet: View {
         isPublishing = true
         error = nil
         publication = Task { @MainActor in
-            defer { isPublishing = false; publication = nil }
+            defer {
+                isPublishing = false
+                publication = nil
+                if linearClient == nil { Task { await loadLinear() } }
+            }
             do {
                 _ = try await LinearTaskPublisher.publish(
                     review: snapshot, selectedIDs: selected, meeting: meeting,
@@ -248,7 +253,11 @@ struct DevelopmentTasksSheet: View {
                     save: { next, previous in
                         try app.store.archive.saveDevelopmentTasks(next, for: meeting.id, replacing: previous)
                     }, onProgress: { next in review = next; savedReview = next })
-            } catch { self.error = error.localizedDescription }
+            } catch {
+                self.error = Task.isCancelled
+                    ? "Publishing stopped. Retry to recover any issue already created."
+                    : error.localizedDescription
+            }
         }
     }
 

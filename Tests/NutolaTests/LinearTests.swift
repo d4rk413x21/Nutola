@@ -33,7 +33,7 @@ final class LinearTests: XCTestCase {
     }
 
     private var meeting: Meeting {
-        var meeting = Meeting(title: "Planning")
+        var meeting = Meeting(title: "Planning", createdAt: Date(timeIntervalSince1970: 1_700_000_000))
         meeting.speakers = [Speaker(id: "s1", name: "Alice")]
         return meeting
     }
@@ -294,6 +294,28 @@ final class LinearTests: XCTestCase {
             workspaceID: workspace, teamID: team, projectID: nil, client: client, save: { next, _ in saved = next })
         XCTAssertEqual(mutations, 1)
         XCTAssertNotNil(saved.tasks[0].linearExport?.url)
+    }
+
+    @MainActor
+    func testCancellationAfterCheckpointStopsNetworkRequestsAndRetainsRetryID() async throws {
+        let original = review()
+        let id = original.tasks[0].id
+        var saved = original
+        let client = try LinearClient(apiKey: "key", transport: { _ in
+            XCTFail("Cancelled publishing must not send requests")
+            throw URLError(.cancelled)
+        })
+        let task = Task { @MainActor in
+            try await LinearTaskPublisher.publish(review: original, selectedIDs: [id], meeting: meeting,
+                workspaceID: workspace, teamID: team, projectID: nil, client: client,
+                save: { next, _ in saved = next }, onProgress: { _ in
+                    withUnsafeCurrentTask { $0?.cancel() }
+                })
+        }
+        do { _ = try await task.value; XCTFail("Expected cancellation") }
+        catch is CancellationError {}
+        XCTAssertEqual(saved.tasks[0].linearExport?.id, id)
+        XCTAssertNil(saved.tasks[0].linearExport?.url)
     }
 
     func testLegacyDraftsDecodeWithoutLinearMetadata() throws {

@@ -228,6 +228,17 @@ can refine or cancel earlier requests. Each draft includes editable text, an opt
 and original transcript passages with speaker names and timestamps. Unassigned work stays
 unassigned.
 
+Long transcripts, including a single oversized utterance, are split without discarding text.
+Extraction reads each part independently; reconciliation pages through earlier drafts to apply
+later changes, cancellations and duplicate requests. Unchanged drafts stay in the app, and
+merged drafts retain their original source references. Longer histories require more CLI calls
+instead of an ever-growing prompt.
+
+App-supplied instructions and input are limited to 32,000 UTF-8 bytes per request, with 8,000-byte
+transcript and draft batches. This is a conservative payload budget, not a model-specific token
+count: a custom model with a smaller context window can still reject a request. Oversized individual
+drafts or responses stop analysis with an error, preserving previously saved drafts.
+
 Drafts are saved alongside the meeting in `development-tasks.json`. Re-extracting asks before
 replacing edits; failures and cancellation keep existing drafts. A warning appears if the
 transcript has changed since extraction. Select drafts and use **Copy selected drafts** to

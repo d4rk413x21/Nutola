@@ -61,10 +61,10 @@ final class ZoomSpeakerTracker: PlatformSpeakerTracker, @unchecked Sendable {
 
     /// Called on the main queue when the local participant's Zoom mute state changes.
     /// True = muted in Zoom (don't capture mic), false = unmuted (capture mic).
-    var onLocalMuteChanged: (@MainActor (Bool) -> Void)?
+    @MainActor var onLocalMuteChanged: (@MainActor (Bool) -> Void)?
 
      /// Called on the main queue whenever the active remote speaker changes.
-     var onActiveSpeaker: (@MainActor (String?) -> Void)?
+     @MainActor var onActiveSpeaker: (@MainActor (String?) -> Void)?
     /// Thread-safe snapshot of the active speaker name at a given elapsed time.
     /// Called from the LiveTranscriber's handle() to attribute system-audio
     /// segments to the Zoom-reported speaker instead of generic "Others".
@@ -205,8 +205,7 @@ final class ZoomSpeakerTracker: PlatformSpeakerTracker, @unchecked Sendable {
         if let muted = scan.localParticipantMuted, muted != lastLocalMuted {
             lastLocalMuted = muted
             NutolaConsoleLog.zoom("local participant \(muted ? "muted" : "unmuted") — \(muted ? "pausing mic capture" : "resuming mic capture")")
-            let cb = onLocalMuteChanged
-            DispatchQueue.main.async { cb?(muted) }
+            DispatchQueue.main.async { self.onLocalMuteChanged?(muted) }
         }
 
         let now = Date()

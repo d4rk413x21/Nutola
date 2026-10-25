@@ -12,4 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// The block is allowed to be nil (returns nil).
 FOUNDATION_EXPORT NSException *_Nullable NutolaTryBlock(void (^_Nullable block)(void));
 
+/// Bridges the immutable Accessibility prompt key, which the C SDK imports as a mutable global in Swift.
+FOUNDATION_EXPORT BOOL NutolaRequestAccessibilityTrust(void);
+
 NS_ASSUME_NONNULL_END

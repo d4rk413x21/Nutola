@@ -1,4 +1,5 @@
 #import "ExceptionCatch.h"
+#import <ApplicationServices/ApplicationServices.h>
 
 NSException *_Nullable NutolaTryBlock(void (^_Nullable block)(void)) {
     @try {
@@ -7,4 +8,9 @@ NSException *_Nullable NutolaTryBlock(void (^_Nullable block)(void)) {
         return exception;
     }
     return nil;
+}
+
+BOOL NutolaRequestAccessibilityTrust(void) {
+    NSDictionary *options = @{(__bridge NSString *)kAXTrustedCheckOptionPrompt: @YES};
+    return AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
 }

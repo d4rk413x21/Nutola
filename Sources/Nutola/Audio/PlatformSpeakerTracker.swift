@@ -9,13 +9,13 @@ import Foundation
 /// fall back to `NoopSpeakerTracker` (diarization-only). Adding a platform is
 /// a new conformer + a line in `PlatformSpeakerTrackerFactory.forApp(_:)`,
 /// not a change to `RecordingSession`.
-protocol PlatformSpeakerTracker: AnyObject {
+protocol PlatformSpeakerTracker: AnyObject, Sendable {
     /// Called on the main queue whenever the active remote speaker changes.
-    var onActiveSpeaker: (@MainActor (String?) -> Void)? { get set }
+    @MainActor var onActiveSpeaker: (@MainActor (String?) -> Void)? { get set }
 
     /// Called on the main queue when the local participant's Zoom mute state changes.
     /// True = muted (stop mic capture), false = unmuted (resume mic capture).
-    var onLocalMuteChanged: (@MainActor (Bool) -> Void)? { get set }
+    @MainActor var onLocalMuteChanged: (@MainActor (Bool) -> Void)? { get set }
 
     /// Thread-safe snapshot of the active speaker name at elapsed time `t`,
     /// for attributing live system-audio segments.
@@ -32,7 +32,7 @@ protocol PlatformSpeakerTracker: AnyObject {
 /// tracker for platforms without an AX/caption reader, so `RecordingSession`
 /// always has *something* conforming and never nil-checks the platform.
 enum PlatformSpeakerTrackerFactory {
-    static func forApp(
+    @MainActor static func forApp(
         bundleID: String?,
         meetingID: UUID,
         archive: MeetingArchive,
@@ -55,11 +55,12 @@ enum PlatformSpeakerTrackerFactory {
 /// A no-op tracker for platforms Nutola can't read by AX yet. Conforms so
 /// `RecordingSession` treats every platform uniformly; `speakerAt` returns
 /// nil (so diarization owns attribution) and the roster stays empty.
+@MainActor
 final class NoopSpeakerTracker: PlatformSpeakerTracker {
     var onActiveSpeaker: (@MainActor (String?) -> Void)?
     var onLocalMuteChanged: (@MainActor (Bool) -> Void)?
-    func speakerAt(_ elapsed: TimeInterval) -> String? { nil }
-    func currentRoster() -> [String] { [] }
-    func start() {}
-    func stop() {}
+    nonisolated func speakerAt(_ elapsed: TimeInterval) -> String? { nil }
+    nonisolated func currentRoster() -> [String] { [] }
+    nonisolated func start() {}
+    nonisolated func stop() {}
 }

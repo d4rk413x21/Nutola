@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import Foundation
+import ExceptionCatch
 
 /// macOS Accessibility trust — required to read Zoom's active-speaker UI.
 enum AccessibilityPermission {
@@ -19,8 +20,6 @@ enum AccessibilityPermission {
 
     /// Opens System Settings → Privacy & Security → Accessibility with the prompt.
     static func requestTrust() {
-        let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        let options = [key: true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
+        _ = NutolaRequestAccessibilityTrust()
     }
 }

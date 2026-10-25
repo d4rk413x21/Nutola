@@ -13,18 +13,18 @@ concurrency:
 
 jobs:
   test:
-    runs-on: macos-26
+    runs-on: xcode-27
     env:
-      # The image's default is Xcode 26.5; match the SDK the project targets.
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      # Pin the stable toolchain: the image also contains release candidates.
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - name: Detect packaging changes
         id: packaging
         run: |
-          if git diff --quiet HEAD^ HEAD -- Makefile packaging/ Sources/Nutola/App/AppIdentity.swift; then
+          if git diff --quiet HEAD^ HEAD -- Makefile Package.swift Package.resolved packaging/ Sources/Nutola/App/AppIdentity.swift .github/workflows/ci.yml .github/workflows/release.yml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -34,8 +34,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: .build
-          key: spm-v2-${{ runner.os }}-${{ runner.arch }}-xcode26.6-debug-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{ hashFiles('Sources/**', 'Tests/**') }}
-          restore-keys: spm-v2-${{ runner.os }}-${{ runner.arch }}-xcode26.6-debug-${{ hashFiles('Package.swift', 'Package.resolved') }}-
+          key: spm-v3-${{ runner.os }}-${{ runner.arch }}-xcode27.1-debug-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{ hashFiles('Sources/**', 'Tests/**') }}
+          restore-keys: spm-v3-${{ runner.os }}-${{ runner.arch }}-xcode27.1-debug-${{ hashFiles('Package.swift', 'Package.resolved') }}-
       - run: swift --version && xcodebuild -version
       - name: Build and test
         run: swift test
@@ -58,7 +58,7 @@ jobs:
 
       - name: Upload preview artifact
         if: github.event_name == 'workflow_dispatch' || steps.packaging.outputs.changed == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Nutola-preview
           path: dist/Nutola.zip

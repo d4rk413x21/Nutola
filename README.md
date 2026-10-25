@@ -81,8 +81,10 @@ MCP includes editing and deletion tools, so review the permissions granted to yo
 
 ## Build from source
 
-Building locally requires Xcode 26.6 and its command-line tools. Alternatively, use
-GitHub Actions as described above.
+Building locally requires Xcode 27.1 (Swift 6.4) and its command-line tools. Alternatively,
+use GitHub Actions as described above. CI pins the stable Xcode 27.1 toolchain on the
+`xcode-27` runner image, which GitHub currently labels as preview. Sources retain Swift 5
+language compatibility mode; this does not change the Swift 6.4 compiler version.
 
 ```bash
 git clone https://github.com/d4rk413x21/Nutola.git

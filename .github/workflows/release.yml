@@ -9,11 +9,11 @@ permissions:
 
 jobs:
   package:
-    runs-on: macos-26
+    runs-on: xcode-27
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.release.tag_name }}
 
@@ -28,11 +28,14 @@ jobs:
           printf '%s\n' "${RELEASE_TAG#v}" > VERSION
 
       - name: Cache SwiftPM
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .build
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
-          restore-keys: spm-${{ runner.os }}-
+          key: spm-v3-${{ runner.os }}-${{ runner.arch }}-xcode27.1-release-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{ hashFiles('Sources/**', 'Makefile', 'packaging/**') }}
+          restore-keys: spm-v3-${{ runner.os }}-${{ runner.arch }}-xcode27.1-release-${{ hashFiles('Package.swift', 'Package.resolved') }}-
+
+      - name: Toolchain versions
+        run: swift --version && xcodebuild -version
 
       - name: Build release app
         run: make app

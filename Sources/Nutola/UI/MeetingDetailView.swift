@@ -99,6 +99,16 @@ struct MeetingDetailView: View {
             }
         }
         .task { await app.calendar.refreshAgenda() }
+        .trackingEdits(isDirty: { hasUnsavedEdits }, save: {
+            if let draft = notesDraft {
+                guard app.store.saveSummarySafely(draft, for: meeting.id) else { return false }
+                notesDraft = nil
+            }
+            return saveTitle()
+        }, discard: {
+            title = meeting.title
+            discardNotesEdits()
+        })
         .onAppear {
             loadSideNotes()
             presentTranscriptIfNeeded()
@@ -157,6 +167,21 @@ struct MeetingDetailView: View {
     private func loadSideNotes() {
         sideNotes = app.store.sideNotes(for: meeting.id)
         showSideNotes = isRecordingThisMeeting || isPrepMeeting || hasSideNotes
+    }
+
+    private var hasUnsavedEdits: Bool {
+        if title.trimmingCharacters(in: .whitespacesAndNewlines) != meeting.title { return true }
+        guard let draft = notesDraft else { return false }
+        let file = app.store.archive.folder(for: meeting.id).appendingPathComponent("summary.md")
+        return draft != summary || FilePersistence.failure(at: file)?.data == Data(draft.utf8)
+    }
+
+    private func discardNotesEdits() {
+        let file = app.store.archive.folder(for: meeting.id).appendingPathComponent("summary.md")
+        if let draft = notesDraft, FilePersistence.failure(at: file)?.data == Data(draft.utf8) {
+            FilePersistence.discard(file)
+        }
+        notesDraft = nil
     }
 
     private func scheduleSideNotesSave() {
@@ -266,7 +291,7 @@ struct MeetingDetailView: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .focused($isEditingTitle)
-                .onSubmit(saveTitle)
+                .onSubmit { saveTitle() }
                 .onChange(of: isEditingTitle) { if !isEditingTitle { saveTitle() } }
 
             metadataChips
@@ -623,11 +648,7 @@ struct MeetingDetailView: View {
             HStack {
                 Spacer()
                 Button("Cancel") {
-                    let file = app.store.archive.folder(for: meeting.id).appendingPathComponent("summary.md")
-                    if let notesDraft, FilePersistence.failure(at: file)?.data == Data(notesDraft.utf8) {
-                        FilePersistence.discard(file)
-                    }
-                    notesDraft = nil
+                    discardNotesEdits()
                 }
                     .keyboardShortcut(.cancelAction)
                 Button("Save") {
@@ -968,12 +989,19 @@ struct MeetingDetailView: View {
         .fixedSize()
     }
 
-    private func saveTitle() {
+    @discardableResult
+    private func saveTitle() -> Bool {
         let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty, t != meeting.title else { return }
-        var m = meeting
+        guard t != meeting.title else { return true }
+        guard !t.isEmpty else {
+            PersistenceStatus.shared.operationError = "A meeting needs a title."
+            return false
+        }
+        guard var m = app.store.meeting(id: meeting.id) else { return false }
         m.title = t
         app.store.upsert(m)
+        return FilePersistence.failure(at: app.store.archive.folder(for: m.id)
+            .appendingPathComponent("meeting.json")) == nil
     }
 
     private func copyNotes() {

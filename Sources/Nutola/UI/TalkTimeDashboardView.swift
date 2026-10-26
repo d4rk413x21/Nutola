@@ -16,6 +16,12 @@ struct TalkTimeDashboardView: View {
     /// any slice works — empty input renders an empty state.
     let meetings: [Meeting]
 
+    @State private var summaries: [SpeakerTalkTimeSummary] = []
+    private struct SnapshotKey: Equatable {
+        var meetings: [Meeting]
+        var transcriptRevision: UInt64
+    }
+
     @State private var renaming: SpeakerTalkTimeSummary?
     @State private var newName: String = ""
     @State private var merging: SpeakerTalkTimeSummary?
@@ -34,6 +40,18 @@ struct TalkTimeDashboardView: View {
                     speakerRow(summary)
                 }
             }
+        }
+        .task(id: SnapshotKey(meetings: meetings, transcriptRevision: app.store.transcriptRevision)) {
+            let meetings = meetings
+            let archive = app.store.archive
+            let result = await Task.detached(priority: .utility) {
+                TalkTimeAggregator.aggregate(
+                    meetings: meetings,
+                    transcripts: meetings.map { ($0.id, archive.transcript(for: $0.id)) },
+                    speakers: meetings.map { ($0.id, $0.speakers) })
+            }.value
+            guard !Task.isCancelled else { return }
+            summaries = result
         }
         .sheet(item: $renaming) { summary in
             renameSheet(summary)
@@ -168,15 +186,6 @@ struct TalkTimeDashboardView: View {
 
     // MARK: - Aggregation
 
-    private var summaries: [SpeakerTalkTimeSummary] {
-        let transcripts = meetings.map { ($0.id, app.store.transcript(for: $0.id)) }
-        let speakers = meetings.map { ($0.id, $0.speakers) }
-        return TalkTimeAggregator.aggregate(
-            meetings: meetings,
-            transcripts: transcripts,
-            speakers: speakers)
-    }
-
     // MARK: - Formatting
 
     /// Formats a duration (in seconds) as compact `Xh Ym`, or just `Ym` under an
@@ -277,7 +286,8 @@ struct TalkTimeDashboardView: View {
                     }
                 }
             }
-            Text("Applies to every meeting where “\(summary.name)” appears.")
+            Text(summary.meetingID != nil ? "Applies only to this voice in its meeting."
+                 : "Applies to every meeting where “\(summary.name)” appears.")
                 .font(.nutola(10))
                 .foregroundStyle(Theme.tertiary(scheme))
             HStack {
@@ -295,22 +305,31 @@ struct TalkTimeDashboardView: View {
     private func commitRename(_ summary: SpeakerTalkTimeSummary) {
         let target = newName.trimmingCharacters(in: .whitespaces)
         guard !target.isEmpty else { return }
-        app.store.bulkRenameSpeakers(from: summary.name, to: target)
+        rename(summary, to: target)
         renaming = nil
         newName = ""
     }
 
+    private func rename(_ summary: SpeakerTalkTimeSummary, to target: String) {
+        if let meetingID = summary.meetingID, let speakerID = summary.localSpeakerID {
+            app.store.renameSpeaker(meetingID: meetingID, speakerID: speakerID, to: target)
+        } else {
+            app.store.bulkRenameSpeakers(from: summary.name, to: target)
+        }
+    }
+
     private func mergeSheet(_ summary: SpeakerTalkTimeSummary) -> some View {
-        let others = summaries.filter { $0.speakerID != summary.speakerID }
+        let others = summaries.filter { $0.speakerID != summary.speakerID && !Speaker.isAnonymousName($0.name) }
         return VStack(alignment: .leading, spacing: 12) {
             Text("Merge \(summary.name) into…")
                 .font(.nutola(15, .semibold))
-            Text("Renames \(summary.name) in every meeting to match the speaker you pick.")
+            Text(summary.meetingID != nil ? "Names only this voice in its meeting."
+                 : "Renames \(summary.name) in every meeting to match the speaker you pick.")
                 .font(.nutola(11))
                 .foregroundStyle(Theme.tertiary(scheme))
             ForEach(others) { other in
                 Button {
-                    app.store.bulkRenameSpeakers(from: summary.name, to: other.name)
+                    rename(summary, to: other.name)
                     merging = nil
                 } label: {
                     HStack {

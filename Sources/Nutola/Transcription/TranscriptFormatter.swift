@@ -2,6 +2,20 @@ import Foundation
 
 /// Renders transcripts as text for prompts, export, editing, and MCP responses.
 enum TranscriptFormatter {
+    static func clipboardText(meeting: Meeting, saved: [TranscriptSegment], liveMeetingID: UUID?,
+                              live: [TranscriptSegment], localName: String, remoteName: String) -> String {
+        let includeLive = liveMeetingID == meeting.id
+        var speakers = meeting.speakers
+        if includeLive {
+            for speaker in [Speaker(id: LiveTranscriber.youSpeakerID, name: localName, isMe: true),
+                            Speaker(id: LiveTranscriber.othersSpeakerID, name: remoteName)]
+            where !speakers.contains(where: { $0.id == speaker.id }) {
+                speakers.append(speaker)
+            }
+        }
+        return plainText(saved + (includeLive ? live : []), speakers: speakers)
+    }
+
     /// "Alice @ 12:04: We should ship on Friday."
     static func plainText(_ segments: [TranscriptSegment], speakers: [Speaker]) -> String {
         let names = Dictionary(uniqueKeysWithValues: speakers.map { ($0.id, $0.name) })

@@ -64,6 +64,7 @@ final class MeetingArchive: @unchecked Sendable {
     /// so a plain Dictionary keyed by UUID is simpler and bounded by the number
     /// of meetings (a few hundred at most).
     private var transcriptCache: [UUID: (mtime: Date, segments: [TranscriptSegment])] = [:]
+    private var summaryCache: [UUID: (mtime: Date, size: UInt64, text: String)] = [:]
 
     /// Returns the decoded transcript for `id`, using the in-memory cache when
     /// the on-disk `transcript.json` hasn't changed since the last decode.
@@ -190,6 +191,7 @@ final class MeetingArchive: @unchecked Sendable {
             }
             FilePersistence.discard(in: directory)
             invalidateTranscriptCache(for: id)
+            summaryCache[id] = nil
         }
     }
 
@@ -363,7 +365,20 @@ final class MeetingArchive: @unchecked Sendable {
     func summary(for id: UUID) -> String {
         queue.sync {
             let file = folder(for: id).appendingPathComponent("summary.md")
-            return (try? FilePersistence.read(file)).map { String(decoding: $0, as: UTF8.self) } ?? ""
+            if let pending = FilePersistence.failure(at: file) {
+                return String(decoding: pending.data, as: UTF8.self)
+            }
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
+                  let mtime = attributes[.modificationDate] as? Date,
+                  let size = attributes[.size] as? UInt64 else {
+                summaryCache[id] = nil
+                return ""
+            }
+            if let cached = summaryCache[id], cached.mtime == mtime, cached.size == size { return cached.text }
+            guard let data = try? FilePersistence.read(file) else { summaryCache[id] = nil; return "" }
+            let text = String(decoding: data, as: UTF8.self)
+            summaryCache[id] = (mtime, size, text)
+            return text
         }
     }
 
@@ -383,6 +398,7 @@ final class MeetingArchive: @unchecked Sendable {
                 snapshotSummary(existing, for: id)
             }
             guard let data = markdown.data(using: .utf8) else { throw ArchiveError.encodingFailed }
+            summaryCache[id] = nil
             try FilePersistence.write(data, to: summaryURL)
         }
     }

@@ -51,6 +51,19 @@ struct FolderDetailView: View {
             }
         }
         .background(Theme.surface(scheme))
+        .trackingEdits(isDirty: {
+            guard let folder else { return false }
+            return name.trimmingCharacters(in: .whitespacesAndNewlines) != folder.name
+                || descriptionText != (folder.description ?? "")
+        }, save: {
+            saveName()
+            saveDescription()
+            return FilePersistence.failure(at: app.folders.archive.foldersDir
+                .appendingPathComponent("folders.json")) == nil
+        }, discard: {
+            name = folder?.name ?? name
+            descriptionText = folder?.description ?? ""
+        })
         .onChange(of: folder?.name) { _, new in
             if let new, !editingName { name = new }
         }

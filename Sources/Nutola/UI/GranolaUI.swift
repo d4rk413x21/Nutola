@@ -281,13 +281,12 @@ struct GranolaFloatingPanel: View {
   /// Copies the full transcript to the pasteboard — both prior (finalized)
   /// and live segments, formatted as "Speaker: text" lines.
   private func copyTranscript() {
-    let prior = TranscriptTurnBuilder.turns(from: segments)
-    let live = TranscriptTurnBuilder.turns(from: app.session?.liveSegments ?? [])
-    let all = prior + live
-    guard !all.isEmpty else { return }
-    let text = all.map { turn in
-      "\(LiveTranscriber.name(for: turn.speakerID)): \(turn.text)"
-    }.joined(separator: "\n")
+    let session = app.session
+    let text = TranscriptFormatter.clipboardText(
+      meeting: meeting, saved: segments, liveMeetingID: session?.meetingID,
+      live: session?.liveSegments ?? [],
+      localName: LiveTranscriber.localSpeakerName, remoteName: LiveTranscriber.remoteSpeakerName)
+    guard !text.isEmpty else { return }
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
   }
@@ -531,6 +530,7 @@ struct GranolaFloatingPanel: View {
       }
       .buttonStyle(.plain)
       .disabled(!canAskAboutMeeting || askInput.trimmingCharacters(in: .whitespaces).isEmpty)
+      .accessibilityLabel("Send question")
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 10)

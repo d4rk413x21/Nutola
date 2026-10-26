@@ -14,6 +14,7 @@ struct MeetingSearchResult: Identifiable {
 final class MeetingStore: ObservableObject {
     let archive: MeetingArchive
     @Published private(set) var meetings: [Meeting] = []
+    @Published private(set) var transcriptRevision: UInt64 = 0
 
     /// Hook fired after a summary is saved, carrying the meeting id and
     /// the new markdown. Wired by `AppState` to sync action items into the
@@ -67,6 +68,7 @@ final class MeetingStore: ObservableObject {
     func transcript(for id: UUID) -> [TranscriptSegment] { archive.transcript(for: id) }
 
     func saveTranscript(_ segments: [TranscriptSegment], for id: UUID) {
+        defer { transcriptRevision &+= 1 }
         do { try archive.saveTranscript(segments, for: id) }
         catch { PersistenceStatus.shared.report(error) }
     }
@@ -144,6 +146,7 @@ final class MeetingStore: ObservableObject {
         let target = toName.trimmingCharacters(in: .whitespacesAndNewlines)
         let source = fromName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !target.isEmpty, !source.isEmpty else { return 0 }
+        guard !Speaker.isAnonymousName(source) else { return 0 }
         // No-op only when the raw (trimmed) display strings are identical —
         // case/whitespace-only differences (e.g. "alice" → "Alice") still
         // apply so the user can fix capitalization.

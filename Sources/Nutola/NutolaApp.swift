@@ -222,6 +222,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// no moov atom and would be unreadable on the next launch.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         return MainActor.assumeIsolated {
+            guard UnsavedEdits.shared.confirmLeaving() else { return .terminateCancel }
             NotificationCenter.default.post(name: .nutolaFlushEdits, object: nil)
             var discardUnsavedChanges = false
             if !FilePersistence.failures.isEmpty {

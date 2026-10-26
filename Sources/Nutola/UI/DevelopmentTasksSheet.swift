@@ -131,15 +131,23 @@ struct DevelopmentTasksSheet: View {
         }
         .padding(24)
         .frame(width: 760, height: 680)
-        .interactiveDismissDisabled(busy || hasChanges)
+        .interactiveDismissDisabled(busy)
+        .trackingEdits(isDirty: { hasChanges }, save: save, discard: { review = savedReview })
+        .dismissalConfirmationDialog("Discard unsaved task edits?", shouldPresent: hasChanges) {
+            Button("Discard Changes", role: .destructive) { review = savedReview }
+        } message: {
+            Text("Keep editing to save your drafts before closing.")
+        }
         .confirmationDialog("Discard unsaved task edits?", isPresented: $confirmDiscard, titleVisibility: .visible) {
-            Button("Discard and Close", role: .destructive) { dismiss() }
+            Button("Discard and Close", role: .destructive) { review = savedReview; dismiss() }
             Button("Keep Editing", role: .cancel) {}
         } message: {
             Text("Saved drafts and Linear issues will stay unchanged. Copy the selected drafts first if you want to keep the unsaved text elsewhere.")
         }
         .task { load(); await loadLinear() }
         .task(id: teamID) { await loadProjects() }
+        .onChange(of: app.store.transcriptRevision) { refreshTranscriptFingerprint() }
+        .onChange(of: app.store.meetings) { refreshTranscriptFingerprint() }
         .onReceive(NotificationCenter.default.publisher(for: LinearCredentials.changed)) { _ in
             publication?.cancel()
             linearClient = nil
@@ -244,7 +252,16 @@ struct DevelopmentTasksSheet: View {
     private func publish() {
         guard !busy, !isStale, !loadingProjects, let client = linearClient, let workspace,
               teams.contains(where: { $0.id == teamID }),
-              projectID.isEmpty || projects.contains(where: { $0.id == projectID }), save() else { return }
+              projectID.isEmpty || projects.contains(where: { $0.id == projectID }) else { return }
+        do {
+            let latest = app.store.transcript(for: meeting.id)
+            currentFingerprint = latest.isEmpty ? "" : try DevelopmentTaskReview.fingerprint(latest)
+            try review.validateTranscript(latest)
+        } catch {
+            self.error = error.localizedDescription
+            return
+        }
+        guard save() else { return }
         let snapshot = review
         let selected = selectedIDs
         let targetTeam = teamID
@@ -330,6 +347,16 @@ struct DevelopmentTasksSheet: View {
 
     private func speakerName(_ id: String) -> String {
         meeting.speakers.first { $0.id == id }?.name ?? id
+    }
+
+    private func refreshTranscriptFingerprint() {
+        do {
+            let transcript = app.store.transcript(for: meeting.id)
+            currentFingerprint = transcript.isEmpty ? "" : try DevelopmentTaskReview.fingerprint(transcript)
+        } catch {
+            currentFingerprint = ""
+            self.error = error.localizedDescription
+        }
     }
 
     private func load() {

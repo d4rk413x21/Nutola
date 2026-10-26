@@ -96,9 +96,9 @@ struct AILauncherView: View {
     @State private var available = false
     @State private var deliveryModeAvailability: [AskDeliveryMode: Bool] = [:]
     @State private var launchFailed = false
-    @State private var isAnswering = false
-    @State private var messages: [AskChatMessage] = []
-    @State private var loadingMessageID: UUID?
+    @State private var conversation = AskConversation()
+    private var messages: [AskChatMessage] { conversation.messages }
+    private var isAnswering: Bool { conversation.isAnswering }
     @State private var answerTask: Task<Void, Never>?
     @State private var didSubmitInitialQuestion = false
     @State private var didSaveRecipe = false
@@ -140,6 +140,7 @@ struct AILauncherView: View {
             refreshAvailability()
             if isAnswering { stopAnswering() }
         }
+        .onDisappear { stopAnswering() }
     }
 
     private var launcherBody: some View {
@@ -212,7 +213,7 @@ struct AILauncherView: View {
 
     private func newConversation() {
         stopAnswering()
-        messages = []
+        conversation.messages = []
         input = ""
         launchFailed = false
         composeFocused = true
@@ -673,7 +674,7 @@ struct AILauncherView: View {
 
     private func submit(displayText: String, prompt: String) {
         launchFailed = false
-        messages.append(AskChatMessage(role: .user, text: displayText))
+        conversation.messages.append(AskChatMessage(role: .user, text: displayText))
 
         switch effectiveMode {
         case .app:
@@ -690,45 +691,24 @@ struct AILauncherView: View {
 
     private func beginCLIAnswer(prompt: String) {
         answerTask?.cancel()
-        AIAsk.cancel()
-
-        let loadingID = UUID()
-        loadingMessageID = loadingID
-        messages.append(AskChatMessage(id: loadingID, role: .assistant, text: "", isLoading: true))
-        isAnswering = true
-
-        answerTask = Task {
+        let responseID = conversation.beginResponse()
+        answerTask = Task { @MainActor in
             do {
                 let text = try await AIAsk.answer(prompt: prompt) { delta in
                     Task { @MainActor in
-                        updateLoadingMessage(text: delta)
+                        conversation.updateResponse(responseID, text: delta)
                     }
                 }
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    finishLoadingMessage(text: text)
-                    isAnswering = false
-                    answerTask = nil
-                }
-            } catch is CancellationError {
-                await MainActor.run {
-                    removeLoadingMessage()
-                    isAnswering = false
+                try Task.checkCancellation()
+                if conversation.updateResponse(responseID, text: text, finished: true) {
                     answerTask = nil
                 }
             } catch {
-                guard !Task.isCancelled else {
-                    await MainActor.run {
-                        removeLoadingMessage()
-                        isAnswering = false
-                        answerTask = nil
-                    }
-                    return
-                }
-                await MainActor.run {
+                if Task.isCancelled {
+                    if conversation.cancelResponse(responseID) { answerTask = nil }
+                } else if conversation.updateResponse(responseID, text: error.localizedDescription,
+                                                       finished: true, isError: true) {
                     NutolaConsoleLog.ask("answer failed — \(error.localizedDescription)")
-                    finishLoadingMessage(text: error.localizedDescription, isError: true)
-                    isAnswering = false
                     launchFailed = true
                     answerTask = nil
                 }
@@ -738,42 +718,8 @@ struct AILauncherView: View {
 
     private func stopAnswering() {
         answerTask?.cancel()
-        AIAsk.cancel()
-        removeLoadingMessage()
-        isAnswering = false
+        conversation.cancelResponse()
         answerTask = nil
-    }
-
-    private func updateLoadingMessage(text: String) {
-        guard let loadingMessageID,
-              let index = messages.firstIndex(where: { $0.id == loadingMessageID })
-        else { return }
-        messages[index] = AskChatMessage(
-            id: loadingMessageID,
-            role: .assistant,
-            text: text,
-            isLoading: text.isEmpty
-        )
-    }
-
-    private func finishLoadingMessage(text: String, isError: Bool = false) {
-        guard let loadingMessageID,
-              let index = messages.firstIndex(where: { $0.id == loadingMessageID })
-        else { return }
-        messages[index] = AskChatMessage(
-            id: loadingMessageID,
-            role: .assistant,
-            text: text,
-            isLoading: false,
-            isError: isError
-        )
-        self.loadingMessageID = nil
-    }
-
-    private func removeLoadingMessage() {
-        guard let loadingMessageID else { return }
-        messages.removeAll { $0.id == loadingMessageID }
-        self.loadingMessageID = nil
     }
 
     private func launchTyped() {
@@ -897,29 +843,6 @@ private struct AskChatBubble: View {
     }
 }
 
-private struct AskChatMessage: Identifiable {
-    enum Role { case user, assistant }
-
-    let id: UUID
-    let role: Role
-    var text: String
-    var isLoading: Bool
-    var isError: Bool
-
-    init(
-        id: UUID = UUID(),
-        role: Role,
-        text: String,
-        isLoading: Bool = false,
-        isError: Bool = false
-    ) {
-        self.id = id
-        self.role = role
-        self.text = text
-        self.isLoading = isLoading
-        self.isError = isError
-    }
-}
 
 private struct RecipeChip: View {
     @Environment(\.colorScheme) private var scheme

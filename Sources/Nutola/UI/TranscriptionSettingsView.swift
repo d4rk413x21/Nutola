@@ -10,8 +10,9 @@ struct TranscriptionSettings: View {
 
     @State private var installed = false
     @State private var installedBytes: Int64 = 0
-    @State private var downloading = false
-    @State private var progress: Double = 0
+    @State private var download = ModelDownloadProgress()
+    private var downloading: Bool { download.isRunning }
+    private var progress: Double { download.progress }
     @State private var error: String?
     @State private var legacyBytes: Int64 = 0
     @State private var legacyRemovalError: String?
@@ -36,6 +37,7 @@ struct TranscriptionSettings: View {
                         }
                     }
                 }
+                .disabled(downloading)
                 Text(currentModel.detail)
                     .font(.nutola(11))
                     .foregroundStyle(.secondary)
@@ -92,6 +94,12 @@ struct TranscriptionSettings: View {
         }
         .formStyle(.grouped)
         .task(id: model) { await refresh() }
+        .onChange(of: model) {
+            cancelDownload()
+            pendingRemove = false
+            error = nil
+            freedBytes = 0
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await refresh() }
         }
@@ -191,29 +199,26 @@ struct TranscriptionSettings: View {
         legacyBytes = FluidParakeetModels.legacyBytes()
         installed = model.isModelInstalled
         installedBytes = model.modelInstalledBytes
-        if installed {
-            progress = 1
-            downloading = false
-        }
     }
 
     private func startDownload() {
-        downloading = true
-        progress = 0
+        guard downloadTask == nil else { return }
+        let selectedModel = model
+        let requestID = download.start()
         error = nil
         model.logModelEvent("starting download")
         downloadTask = Task {
             do {
-                let selectedModel = model
                 try await selectedModel.downloadModel { fraction in
                     Task { @MainActor in
                         // Progress may be delivered on background queues.
                         // Avoid backwards jumps when FluidAudio starts a new file.
                         if model == selectedModel {
-                            progress = max(progress, min(1, max(0, fraction)))
+                            download.update(requestID, fraction: fraction)
                         }
                     }
                 }
+                guard download.requestID == requestID, model == selectedModel else { return }
                 await refresh()
                 if installed {
                     model.logModelEvent("model installed")
@@ -221,21 +226,21 @@ struct TranscriptionSettings: View {
                     self.error = "Model files downloaded but installation could not be verified."
                 }
             } catch is CancellationError {
-                model.logModelEvent("download cancelled")
+                selectedModel.logModelEvent("download cancelled")
             } catch {
-                await MainActor.run { self.error = error.localizedDescription }
-                model.logModelEvent("download failed — \(error.localizedDescription)")
+                guard download.requestID == requestID else { return }
+                self.error = error.localizedDescription
+                selectedModel.logModelEvent("download failed — \(error.localizedDescription)")
             }
-            downloading = false
+            guard download.finish(requestID) else { return }
             downloadTask = nil
         }
     }
 
     private func cancelDownload() {
+        download.cancel()
         downloadTask?.cancel()
         downloadTask = nil
-        downloading = false
-        progress = 0
         Task { await refresh() }
     }
 
@@ -250,4 +255,31 @@ struct TranscriptionSettings: View {
             self.error = error.localizedDescription
         }
     }
+}
+
+/// Keeps late progress and completion from a cancelled download out of its replacement.
+struct ModelDownloadProgress {
+    private(set) var requestID: UUID?
+    private(set) var progress: Double = 0
+    var isRunning: Bool { requestID != nil }
+
+    mutating func start() -> UUID {
+        let id = UUID()
+        requestID = id
+        progress = 0
+        return id
+    }
+
+    mutating func update(_ id: UUID, fraction: Double) {
+        guard requestID == id, fraction.isFinite else { return }
+        progress = max(progress, min(1, max(0, fraction)))
+    }
+
+    mutating func finish(_ id: UUID) -> Bool {
+        guard requestID == id else { return false }
+        requestID = nil
+        return true
+    }
+
+    mutating func cancel() { requestID = nil; progress = 0 }
 }

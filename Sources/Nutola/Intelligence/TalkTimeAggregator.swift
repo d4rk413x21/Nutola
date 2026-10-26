@@ -13,6 +13,8 @@ struct SpeakerTalkTimeSummary: Identifiable, Equatable, Sendable {
     let avgTalkTimePerMeeting: TimeInterval
     let percentageOfTotal: Double
 
+    var meetingID: UUID? = nil
+    var localSpeakerID: String? = nil
     var id: String { speakerID }
 }
 
@@ -44,6 +46,7 @@ enum TalkTimeAggregator {
         var totals: [String: TimeInterval] = [:]
         var meetingCounts: [String: Int] = [:]
         var names: [String: String] = [:]
+        var origins: [String: (UUID, String)] = [:]
 
         for meeting in meetings {
             let segments = transcriptByID[meeting.id] ?? []
@@ -55,17 +58,15 @@ enum TalkTimeAggregator {
 
             guard !perSpeaker.isEmpty else { continue }
 
+            var counted = Set<String>()
             for stat in perSpeaker {
-                // Cross-meeting aggregation keys on the speaker's NORMALIZED
-                // display name, not the per-meeting speakerID. SpeakerLabeler
-                // resets IDs (`s1`, `s2`, ...) per meeting, so the same person
-                // gets a different ID in each call. Two meetings with "Gui Lima"
-                // as `s1` and `s2` would otherwise show as two separate rows —
-                // keying by name collapses them into one.
-                let key = Self.nameKey(stat.name)
+                // Anonymous labels identify a voice only within its own meeting.
+                let anonymous = Speaker.isAnonymousName(stat.name)
+                let key = anonymous ? "\(meeting.id)/\(stat.speakerID)" : Self.nameKey(stat.name)
+                if anonymous { origins[key] = (meeting.id, stat.speakerID) }
                 if totals[key] == nil { order.append(key) }
                 totals[key, default: 0] += stat.talkTime
-                meetingCounts[key, default: 0] += 1
+                if counted.insert(key).inserted { meetingCounts[key, default: 0] += 1 }
                 // Prefer the most specific (non-ID) name we see. The first
                 // non-key name wins, and a later meeting can refine an unknown
                 // name into a real one.
@@ -87,7 +88,9 @@ enum TalkTimeAggregator {
                 totalTalkTime: total,
                 meetingCount: count,
                 avgTalkTimePerMeeting: count > 0 ? total / Double(count) : 0,
-                percentageOfTotal: pct)
+                percentageOfTotal: pct,
+                meetingID: origins[key]?.0,
+                localSpeakerID: origins[key]?.1)
         }
         .sorted { lhs, rhs in
             lhs.totalTalkTime != rhs.totalTalkTime

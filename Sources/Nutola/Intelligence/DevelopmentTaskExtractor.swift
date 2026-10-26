@@ -14,6 +14,13 @@ struct DevelopmentTaskReview: Codable, Equatable, Sendable {
     var transcriptFingerprint: String = ""
     var tasks: [DevelopmentTaskDraft] = []
 
+    func validateTranscript(_ transcript: [TranscriptSegment]) throws {
+        guard !transcript.isEmpty else { throw DevelopmentTaskError.noTranscript }
+        guard try Self.fingerprint(transcript) == transcriptFingerprint else {
+            throw DevelopmentTaskError.transcriptChanged
+        }
+    }
+
     static func fingerprint(_ transcript: [TranscriptSegment]) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys

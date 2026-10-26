@@ -13,9 +13,10 @@ struct MainWindowView: View {
     @EnvironmentObject private var app: AppState
     @Environment(\.colorScheme) private var scheme
     @Environment(\.nutolaActionColor) private var actionColor
-    @State private var selection: SidebarItem?
+    @State private var selection: SidebarItem? = .home
     @State private var presentedMeetingID: UUID?
     @State private var showNewFolder = false
+    @ObservedObject private var edits = UnsavedEdits.shared
 
     var body: some View {
         NavigationSplitView {
@@ -27,7 +28,11 @@ struct MainWindowView: View {
         .background(Theme.surface(scheme))
         .onAppear { adoptPendingSelection() }
         .onChange(of: app.openMeetingID) { adoptPendingSelection() }
-        .onChange(of: selection) { _, _ in presentedMeetingID = nil }
+        .dismissalConfirmationDialog("Discard unsaved changes?", shouldPresent: edits.hasChanges) {
+            Button("Discard Changes", role: .destructive) { edits.discardAll() }
+        } message: {
+            Text("Keep editing to save your changes before closing this window.")
+        }
         .sheet(isPresented: $showNewFolder) {
             FolderEditorSheet(title: "New folder") { name, description, kind, value, colorHex in
                 let folder = app.folders.createFolder(
@@ -36,21 +41,28 @@ struct MainWindowView: View {
                     iconKind: kind,
                     iconValue: value,
                     iconColorHex: colorHex)
-                selection = .folder(folder.id)
+                select(.folder(folder.id))
             }
         }
     }
 
     private func adoptPendingSelection() {
         if let id = app.openMeetingID {
-            presentedMeetingID = id
             app.openMeetingID = nil
-        } else if selection == nil {
-            selection = .home
+            guard presentedMeetingID == id || edits.confirmLeaving() else { return }
+            presentedMeetingID = id
         }
     }
 
     private func dismissMeeting() {
+        guard edits.confirmLeaving() else { return }
+        presentedMeetingID = nil
+    }
+
+    private func select(_ item: SidebarItem?) {
+        guard item != selection || presentedMeetingID != nil else { return }
+        guard edits.confirmLeaving() else { return }
+        selection = item
         presentedMeetingID = nil
     }
     private var meetingBackTitle: String {
@@ -67,7 +79,7 @@ struct MainWindowView: View {
     }
 
     private var sidebar: some View {
-        List(selection: $selection) {
+        List(selection: Binding(get: { selection }, set: select)) {
             navSection
             foldersSection
         }

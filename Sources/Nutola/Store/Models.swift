@@ -15,6 +15,12 @@ struct Speaker: Codable, Identifiable, Equatable, Sendable {
     /// Display name, user-editable ("Me", "Speaker 1", "Alice").
     var name: String
     var isMe: Bool = false
+
+    static func isAnonymousName(_ raw: String) -> Bool {
+        let name = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return ["", "others", "them", "unknown", "unknown speaker"].contains(name)
+            || name.range(of: #"^(speaker\s*\d+|s\d+)$"#, options: .regularExpression) != nil
+    }
 }
 
 enum MeetingState: String, Codable, Sendable {

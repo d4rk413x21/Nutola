@@ -13,8 +13,8 @@ struct NutolaApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuBarView()
-                .environmentObject(app)
                 .modifier(PersistenceWarning())
+                .environmentObject(app)
                 .nutolaAppearance()
         } label: {
             MenuBarLabel(
@@ -26,8 +26,8 @@ struct NutolaApp: App {
         .menuBarExtraStyle(.window)
         Window("Nutola", id: "main") {
             MainWindowView()
-                .environmentObject(app)
                 .modifier(PersistenceWarning())
+                .environmentObject(app)
                 .nutolaAppearance()
         }
         .defaultSize(width: 980, height: 640)
@@ -57,8 +57,8 @@ struct NutolaApp: App {
 
         Settings {
             SettingsView()
-                .environmentObject(app)
                 .modifier(PersistenceWarning())
+                .environmentObject(app)
                 .nutolaAppearance()
         }
     }

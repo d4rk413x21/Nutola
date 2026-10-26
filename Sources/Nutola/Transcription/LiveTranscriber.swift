@@ -210,7 +210,7 @@ final class LiveTranscriber: @unchecked Sendable {
   private func feed(_ buffer: AVAudioPCMBuffer, speakerID: String) {
     // The tap/engine buffer is only valid for this callback — deep-copy before
     // handing it to another task.
-    guard let copy = Self.copy(buffer) else { return }
+    guard let copy = CopiedAudioBuffer(buffer) else { return }
     let channel = lock.withLock { channels.first { $0.speakerID == speakerID } }
     channel?.rawContinuation.yield(copy)
   }
@@ -267,7 +267,7 @@ final class LiveTranscriber: @unchecked Sendable {
 
     // Raw tap/engine buffers arrive here from the audio thread (bounded so a
     // slow converter drops audio rather than growing memory unbounded).
-    let (rawStream, rawContinuation) = AsyncStream<AVAudioPCMBuffer>.makeStream(
+    let (rawStream, rawContinuation) = AsyncStream<CopiedAudioBuffer>.makeStream(
       bufferingPolicy: .bufferingNewest(64))
     let (inputStream, inputContinuation) = AsyncStream<AnalyzerInput>.makeStream()
 
@@ -276,7 +276,8 @@ final class LiveTranscriber: @unchecked Sendable {
     let convertTask = Task.detached {
       var converter: AVAudioConverter?
       var converterInput: AVAudioFormat?
-      for await raw in rawStream {
+      for await copied in rawStream {
+        let raw = copied.buffer
         if converter == nil || converterInput != raw.format {
           converter = AVAudioConverter(from: raw.format, to: analyzerFormat)
           converter?.primeMethod = .none
@@ -524,12 +525,12 @@ final class LiveTranscriber: @unchecked Sendable {
 
   private final class Channel {
     let speakerID: String
-    let rawContinuation: AsyncStream<AVAudioPCMBuffer>.Continuation
+    let rawContinuation: AsyncStream<CopiedAudioBuffer>.Continuation
     private let tasks: [Task<Void, Never>]
 
     init(
       speakerID: String,
-      rawContinuation: AsyncStream<AVAudioPCMBuffer>.Continuation,
+      rawContinuation: AsyncStream<CopiedAudioBuffer>.Continuation,
       tasks: [Task<Void, Never>]
     ) {
       self.speakerID = speakerID
@@ -542,13 +543,22 @@ final class LiveTranscriber: @unchecked Sendable {
 
   // MARK: - Buffer helpers
 
+  // The SDK cannot prove PCM ownership; only fresh deep copies enter the single-consumer stream.
+  private struct CopiedAudioBuffer: @unchecked Sendable {
+    let buffer: AVAudioPCMBuffer
+
+    init?(_ source: AVAudioPCMBuffer) {
+      guard let copy = LiveTranscriber.copy(source) else { return nil }
+      buffer = copy
+    }
+  }
+
   /// Deep-copies a float PCM buffer (the only sample format the mic engine and
   /// the Core Audio tap deliver). Returns nil for empty or non-float buffers —
   /// live transcription simply skips those; the batch pass still has them.
-  static func copy(_ buffer: AVAudioPCMBuffer) -> sending AVAudioPCMBuffer? {
+  static func copy(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer? {
     guard buffer.frameLength > 0,
-      let format = AVAudioFormat(streamDescription: buffer.format.streamDescription),
-      let out = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: buffer.frameLength),
+      let out = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: buffer.frameLength),
       let src = buffer.floatChannelData, let dst = out.floatChannelData
     else { return nil }
     out.frameLength = buffer.frameLength

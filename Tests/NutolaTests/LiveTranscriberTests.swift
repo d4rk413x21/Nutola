@@ -1,7 +1,30 @@
+import AVFoundation
 import XCTest
 @testable import Nutola
 
 final class LiveTranscriberTests: XCTestCase {
+    func testAudioCopyOwnsItsSamplesBeforeTransfer() throws {
+        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        let source = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 2))
+        source.frameLength = 2
+        let samples = try XCTUnwrap(source.floatChannelData)
+        samples[0][0] = 0.25
+        samples[0][1] = 0.5
+        samples[1][0] = -0.25
+        samples[1][1] = -0.5
+
+        let copy = try XCTUnwrap(LiveTranscriber.copy(source))
+        samples[0][0] = 1
+        samples[1][1] = 1
+        let copied = try XCTUnwrap(copy.floatChannelData)
+        XCTAssertEqual(copy.frameLength, 2)
+        XCTAssertEqual(copy.format, source.format)
+        XCTAssertEqual(copied[0][0], 0.25)
+        XCTAssertEqual(copied[0][1], 0.5)
+        XCTAssertEqual(copied[1][0], -0.25)
+        XCTAssertEqual(copied[1][1], -0.5)
+    }
+
     func testTurnsGroupConsecutiveSameSpeaker() {
         let segments = [
             TranscriptSegment(speakerID: "me", start: 0, end: 0, text: "Hi"),

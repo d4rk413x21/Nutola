@@ -1247,11 +1247,13 @@ struct MeetingDetailView: View {
         panel.nameFieldStringValue = safeFilename + ".pdf"
         panel.allowedContentTypes = [.pdf]
         guard panel.runModal() == .OK, let dest = panel.url else { return }
-        try? PDFExporter.exportPDF(
-            meeting: meeting,
-            summaryMarkdown: app.store.summary(for: meeting.id),
-            segments: app.store.transcript(for: meeting.id),
-            to: dest)
+        do {
+            try PDFExporter.exportPDF(
+                meeting: meeting,
+                summaryMarkdown: app.store.summary(for: meeting.id),
+                segments: app.store.transcript(for: meeting.id),
+                to: dest)
+        } catch { PersistenceStatus.shared.report(error) }
     }
 
     private var safeFilename: String {

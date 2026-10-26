@@ -102,8 +102,9 @@ final class ArchivedEventStore: ObservableObject {
     }
 
     private func persistEvents() {
-        if let data = try? JSONEncoder().encode(archivedEvents) {
+        do {
+            let data = try JSONEncoder().encode(archivedEvents)
             defaults.set(data, forKey: idsKey)
-        }
+        } catch { PersistenceStatus.record(error) }
     }
 }

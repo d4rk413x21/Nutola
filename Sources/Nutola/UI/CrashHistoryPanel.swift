@@ -301,6 +301,6 @@ struct CrashHistoryPanel: View {
         panel.allowedContentTypes = [.plainText]
         guard panel.runModal() == .OK, let dest = panel.url else { return }
         let text = CrashDiagnosticLog.allCrashesText()
-        try? text.data(using: .utf8)?.write(to: dest, options: .atomic)
+        try? FilePersistence.write(Data(text.utf8), to: dest)
     }
 }

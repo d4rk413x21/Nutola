@@ -45,9 +45,8 @@ final class MeetingStore: ObservableObject {
             meetings.removeAll { $0.id == meeting.id }
             return meeting
         } catch {
-            // A transient write failure (disk full, permissions): keep the
-            // in-memory entry so the meeting doesn't vanish from the UI.
-            return meeting
+            // Keep the latest edits visible while FilePersistence retains the failed write.
+            PersistenceStatus.shared.report(error)
         }
         if let i = meetings.firstIndex(where: { $0.id == meeting.id }) {
             meetings[i] = meeting
@@ -59,7 +58,8 @@ final class MeetingStore: ObservableObject {
     }
 
     func delete(id: UUID) {
-        try? archive.delete(id: id)
+        do { try archive.delete(id: id) }
+        catch { PersistenceStatus.shared.report(error); return }
         meetings.removeAll { $0.id == id }
         onMeetingDeleted?(id)
     }
@@ -67,14 +67,22 @@ final class MeetingStore: ObservableObject {
     func transcript(for id: UUID) -> [TranscriptSegment] { archive.transcript(for: id) }
 
     func saveTranscript(_ segments: [TranscriptSegment], for id: UUID) {
-        try? archive.saveTranscript(segments, for: id)
+        do { try archive.saveTranscript(segments, for: id) }
+        catch { PersistenceStatus.shared.report(error) }
     }
 
     func summary(for id: UUID) -> String { archive.summary(for: id) }
 
     func saveSummary(_ markdown: String, for id: UUID) {
-        try? archive.saveSummary(markdown, for: id)
+        _ = saveSummarySafely(markdown, for: id)
+    }
+
+    @discardableResult
+    func saveSummarySafely(_ markdown: String, for id: UUID) -> Bool {
+        do { try archive.saveSummary(markdown, for: id) }
+        catch { PersistenceStatus.shared.report(error); return false }
         onSummarySaved?(id, markdown)
+        return true
     }
 
     /// Search across all meetings' transcripts and summaries for a query.
@@ -100,10 +108,15 @@ final class MeetingStore: ObservableObject {
         return results.sorted { $0.matchingSegments.count > $1.matchingSegments.count }
     }
 
-    func sideNotes(for id: UUID) -> String { archive.sideNotes(for: id) }
+    func sideNotes(for id: UUID) -> String {
+        let file = archive.folder(for: id).appendingPathComponent("notes.md")
+        return FilePersistence.failures[file].map { String(decoding: $0.data, as: UTF8.self) }
+            ?? archive.sideNotes(for: id)
+    }
 
     func saveSideNotes(_ text: String, for id: UUID) {
-        try? archive.saveSideNotes(text, for: id)
+        do { try archive.saveSideNotes(text, for: id) }
+        catch { PersistenceStatus.shared.report(error) }
     }
 
     /// Rename a speaker everywhere in one meeting.

@@ -8,7 +8,8 @@ struct OnboardingView: View {
     @Environment(\.nutolaActionColor) private var actionColor
     @AppStorage(SettingsKey.didCompleteOnboarding) private var didCompleteOnboarding = false
     @AppStorage(SettingsKey.systemAudioConfirmed) private var systemAudioConfirmed = false
-    @State private var systemAudioStatus = SystemAudioPermission.status()
+    @State private var requestingSystemAudio = false
+    @State private var systemAudioError: String?
     @State private var accessibilityTrusted = AccessibilityPermission.isTrusted
 
     @State private var micStatus = MicRecorder.permissionGranted
@@ -57,7 +58,6 @@ struct OnboardingView: View {
         .frame(width: 520)
         .background(Theme.surface(scheme))
         .onAppear {
-            systemAudioStatus = SystemAudioPermission.status()
             accessibilityTrusted = AccessibilityPermission.isTrusted
             micStatus = MicRecorder.permissionGranted
             calendarStatus = CalendarAuthorization.isAuthorized
@@ -71,7 +71,6 @@ struct OnboardingView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            systemAudioStatus = SystemAudioPermission.status()
             accessibilityTrusted = AccessibilityPermission.isTrusted
             micStatus = MicRecorder.permissionGranted
             calendarStatus = CalendarAuthorization.isAuthorized
@@ -104,46 +103,29 @@ struct OnboardingView: View {
             detail: systemAudioDetail,
             ok: systemAudioOK
         ) {
-            switch systemAudioStatus {
-            case .unknown:
-                Button("Grant…") {
-                    Task {
-                        await SystemAudioPermission.request()
-                        systemAudioStatus = SystemAudioPermission.status()
-                    }
-                }
+            Button("Request access", action: requestSystemAudio)
                 .controlSize(.small)
-            case .denied:
-                Button("Open Settings") {
-                    NSWorkspace.shared.open(SystemAudioPermission.privacySettingsURL)
-                }
-                .controlSize(.small)
-            case .authorized:
-                EmptyView()
+                .disabled(requestingSystemAudio)
+            Button("Open Settings") {
+                NSWorkspace.shared.open(SystemAudioPermission.privacySettingsURL)
             }
+            .controlSize(.small)
         }
     }
 
-    private var systemAudioOK: Bool? {
-        if systemAudioStatus == .authorized { return true }
-        if systemAudioStatus == .denied { return false }
-        return nil
-    }
+    private var systemAudioOK: Bool? { nil }
 
     private var systemAudioDetail: String {
-        if systemAudioConfirmed, systemAudioStatus != .authorized {
-            return "Previously captured call audio, but macOS no longer shows an active grant — click Grant to re-allow."
-        }
-        if systemAudioConfirmed {
-            return "Confirmed — captured system audio in a previous recording."
-        }
-        switch systemAudioStatus {
-        case .authorized:
-            return "Allowed — records the other participants on calls."
-        case .denied:
-            return "Denied — enable Nutola under System Audio Recording Only in Settings."
-        case .unknown:
-            return "Records the other participants. Click Grant — macOS will ask to allow system audio recording."
+        systemAudioError ?? SystemAudioPermission.guidance(previouslyCaptured: systemAudioConfirmed)
+    }
+
+    private func requestSystemAudio() {
+        requestingSystemAudio = true
+        systemAudioError = nil
+        Task {
+            defer { requestingSystemAudio = false }
+            do { try await SystemAudioPermission.request() }
+            catch { systemAudioError = error.localizedDescription }
         }
     }
 

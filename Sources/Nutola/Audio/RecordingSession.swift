@@ -476,7 +476,7 @@ final class RecordingSession: ObservableObject {
           "Microphone wasn't recorded (permission missing?) — only the other side of the call was captured."
         )
       }
-      if SystemAudioPermission.status() != .authorized {
+      if !tap.signalDetected {
         parts.append(
           "Grant System Audio Recording in Privacy & Security → System Audio Recording Only.")
       }

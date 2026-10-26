@@ -50,12 +50,8 @@ final class RecordingServiceImpl: RecordingService {
         }
       }
     }
-    let sysBefore = SystemAudioPermission.statusLabel
-    if SystemAudioPermission.status() == .unknown {
-      await SystemAudioPermission.request()
-    }
     NutolaConsoleLog.recording(
-      "permissions mic=\(MicRecorder.permissionGranted) system=\(SystemAudioPermission.statusLabel) (was \(sysBefore))"
+      "permissions mic=\(MicRecorder.permissionGranted) system=\(SystemAudioPermission.statusLabel)"
     )
 
     let resolvedCalendarEvent = await resolveCalendarEvent(
@@ -195,12 +191,8 @@ final class RecordingServiceImpl: RecordingService {
         }
       }
     }
-    let sysBefore = SystemAudioPermission.statusLabel
-    if SystemAudioPermission.status() == .unknown {
-      await SystemAudioPermission.request()
-    }
     NutolaConsoleLog.recording(
-      "permissions mic=\(MicRecorder.permissionGranted) system=\(SystemAudioPermission.statusLabel) (was \(sysBefore))"
+      "permissions mic=\(MicRecorder.permissionGranted) system=\(SystemAudioPermission.statusLabel)"
     )
     guard !isRecording else { return .failure(.alreadyRecording) }
 

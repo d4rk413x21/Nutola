@@ -120,8 +120,10 @@ final class TokenUsageTracker: ObservableObject, @unchecked Sendable {
     }
 
     private func save(_ entries: [DailyTokenUsage]) {
-        let data = try? JSONEncoder().encode(entries)
-        defaults.set(data, forKey: key)
+        do {
+            let data = try JSONEncoder().encode(entries)
+            defaults.set(data, forKey: key)
+        } catch { PersistenceStatus.record(error) }
     }
 
     private func todayString() -> String { string(from: Date()) }

@@ -82,7 +82,9 @@ final class RecipeStore: ObservableObject {
 
     private func save(_ recipes: [Recipe]) {
         objectWillChange.send()
-        let data = try? JSONEncoder().encode(recipes)
-        defaults.set(data, forKey: key)
+        do {
+            let data = try JSONEncoder().encode(recipes)
+            defaults.set(data, forKey: key)
+        } catch { PersistenceStatus.record(error) }
     }
 }

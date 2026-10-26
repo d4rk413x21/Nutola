@@ -62,7 +62,7 @@ final class TemplateStore: @unchecked Sendable {
         guard Self.isValid(name: template.name) else { throw TemplateError.invalidName }
         let url = dir.appendingPathComponent(template.name + ".md")
         guard let data = template.body.data(using: .utf8) else { throw TemplateError.encodingFailed }
-        try data.write(to: url, options: .atomic)
+        try FilePersistence.write(data, to: url)
     }
 
     /// Rename with safety: reject invalid names, refuse to overwrite a different
@@ -83,7 +83,7 @@ final class TemplateStore: @unchecked Sendable {
         // rename appears to do nothing. moveItem performs the actual case change.
         if oldName.lowercased() == newName.lowercased() {
             guard let data = body.data(using: .utf8) else { throw TemplateError.encodingFailed }
-            try data.write(to: oldURL, options: .atomic)
+            try FilePersistence.write(data, to: oldURL)
             try FileManager.default.moveItem(at: oldURL, to: newURL)
             return
         }
@@ -92,11 +92,14 @@ final class TemplateStore: @unchecked Sendable {
         }
         // Write-before-delete so a crash can't lose the body.
         try save(SummaryTemplate(name: newName, body: body))
-        try? FileManager.default.removeItem(at: oldURL)
+        try FileManager.default.removeItem(at: oldURL)
+        FilePersistence.discard(oldURL)
     }
 
     func delete(named name: String) throws {
-        try FileManager.default.removeItem(at: dir.appendingPathComponent(name + ".md"))
+        let url = dir.appendingPathComponent(name + ".md")
+        try FileManager.default.removeItem(at: url)
+        FilePersistence.discard(url)
     }
 
     /// Create-only variant of save(): fails if a template with this name already

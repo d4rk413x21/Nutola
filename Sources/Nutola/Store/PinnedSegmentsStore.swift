@@ -98,9 +98,11 @@ final class PinnedSegmentsStore: ObservableObject, @unchecked Sendable {
     // MARK: - Private
 
     private func persist(_ pins: [PinnedSegment], for meetingID: UUID) {
-        guard let data = try? encoder.encode(pins) else { return }
-        defaults.set(data, forKey: Self.key(for: meetingID))
-        objectWillChange.send()
+        do {
+            let data = try encoder.encode(pins)
+            defaults.set(data, forKey: Self.key(for: meetingID))
+            objectWillChange.send()
+        } catch { PersistenceStatus.record(error) }
     }
 
     static func key(for meetingID: UUID) -> String {

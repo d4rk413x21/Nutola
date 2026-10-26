@@ -69,7 +69,9 @@ final class TemplateOverrideStore: ObservableObject, TemplateOverrideRepository 
     }
 
     private func persist() {
-        guard let data = try? JSONEncoder().encode(overrides) else { return }
-        try? data.write(to: file, options: .atomic)
+        do {
+            let data = try JSONEncoder().encode(overrides)
+            try FilePersistence.write(data, to: file)
+        } catch { PersistenceStatus.record(error) }
     }
 }

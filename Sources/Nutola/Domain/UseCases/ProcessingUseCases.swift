@@ -52,7 +52,9 @@ final class ProcessMeetingUseCase {
 
         onProgress?(id, nil)
         onSummaryProgress?(id, nil)
-        meetingRepository.archive.removeLiveTranscript(for: id)
+        if outcome.state == .ready {
+            meetingRepository.archive.removeLiveTranscript(for: id)
+        }
 
         guard var fresh = meetingRepository.meeting(id: id) else { return }
         guard fresh.state == .processing else { return }
@@ -69,7 +71,9 @@ final class ProcessMeetingUseCase {
             fresh.title = title
         }
         meetingRepository.upsert(fresh)
-        if fresh.state == .ready {
+        if fresh.state == .ready && !FilePersistence.failures.keys.contains(where: {
+            $0.path.hasPrefix(meetingRepository.archive.folder(for: id).path + "/")
+        }) {
             NutolaConsoleLog.processing("done \(id.uuidString.prefix(8)) → ready provider=\(fresh.summaryProvider ?? "?")")
             notificationService.notifyMeetingReady(fresh)
         } else {

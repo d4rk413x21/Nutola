@@ -257,7 +257,13 @@ enum ProcessingPipeline {
             echoEvidence: echoEvidence)
         let offsetSegments = Self.offsetSegments(segments, by: appendOffset)
         let mergedSegments = priorSegments + offsetSegments
-        try? archive.saveTranscript(mergedSegments, for: id)
+        do { try archive.saveTranscript(mergedSegments, for: id) }
+        catch {
+            outcome.state = .failed
+            outcome.notice = "The transcript could not be saved. Keep Nutola open and retry saving."
+            onSummary(.done)
+            return outcome
+        }
         // The meeting may still hold provisional live speakers ("me"/"them").
         // Once the final transcript replaces live.json, never keep speaker
         // identities that are absent from the saved transcript.
@@ -318,9 +324,14 @@ enum ProcessingPipeline {
                     attendees: meeting.attendees)
                     .map { summary + "\n\n" + $0 }
                     ?? summary
-                try? archive.saveSummary(annotated, for: id)
-                savedSummary = annotated
-                outcome.summaryProvider = provider
+                do {
+                    try archive.saveSummary(annotated, for: id)
+                    savedSummary = annotated
+                    outcome.summaryProvider = provider
+                } catch {
+                    outcome.state = .failed
+                    notices.append("The summary could not be saved. Keep Nutola open and retry saving.")
+                }
             }
         case .failure(let why):
             // Improvement failed but the draft (if any) stands.

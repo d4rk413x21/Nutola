@@ -35,7 +35,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Nutola records your side of meetings so it can transcribe and summarize them — entirely on this Mac.</string>
+	<string>Nutola records your side of meetings for transcription. Notes and task analysis use the AI provider you choose.</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Nutola records the other participants' audio during meetings so both sides of the conversation appear in your transcript.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>

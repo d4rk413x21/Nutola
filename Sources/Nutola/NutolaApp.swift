@@ -14,6 +14,7 @@ struct NutolaApp: App {
         MenuBarExtra {
             MenuBarView()
                 .environmentObject(app)
+                .modifier(PersistenceWarning())
                 .nutolaAppearance()
         } label: {
             MenuBarLabel(
@@ -26,6 +27,7 @@ struct NutolaApp: App {
         Window("Nutola", id: "main") {
             MainWindowView()
                 .environmentObject(app)
+                .modifier(PersistenceWarning())
                 .nutolaAppearance()
         }
         .defaultSize(width: 980, height: 640)
@@ -56,6 +58,7 @@ struct NutolaApp: App {
         Settings {
             SettingsView()
                 .environmentObject(app)
+                .modifier(PersistenceWarning())
                 .nutolaAppearance()
         }
     }
@@ -218,10 +221,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Finalize in-flight audio files before quitting — an unclosed AAC file has
     /// no moov atom and would be unreadable on the next launch.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        MainActor.assumeIsolated {
+        return MainActor.assumeIsolated {
+            NotificationCenter.default.post(name: .nutolaFlushEdits, object: nil)
+            var discardUnsavedChanges = false
+            if !FilePersistence.failures.isEmpty {
+                let alert = NSAlert()
+                alert.messageText = "Some changes have not been saved"
+                alert.informativeText = "Keep Nutola open and retry saving. Quitting now discards the file contents held in memory."
+                alert.addButton(withTitle: "Keep Nutola Open")
+                alert.addButton(withTitle: "Quit Without Saving")
+                guard alert.runModal() == .alertSecondButtonReturn else { return .terminateCancel }
+                discardUnsavedChanges = true
+            }
             AppState.shared.prepareForTermination()
+            if !discardUnsavedChanges && !FilePersistence.failures.isEmpty { return .terminateCancel }
+            return .terminateNow
         }
-        return .terminateNow
     }
 }
 

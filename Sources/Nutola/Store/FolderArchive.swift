@@ -52,7 +52,7 @@ final class FolderArchive: @unchecked Sendable {
 
     func allFolders() -> [MeetingFolder] {
         queue.sync {
-            guard let data = try? Data(contentsOf: foldersFile) else { return [] }
+            guard let data = try? FilePersistence.read(foldersFile) else { return [] }
             let folders = (try? decoder.decode([MeetingFolder].self, from: data)) ?? []
             return folders.sorted { $0.sortOrder < $1.sortOrder }
         }
@@ -123,22 +123,22 @@ final class FolderArchive: @unchecked Sendable {
     // MARK: - Private
 
     private func loadFolders() -> [MeetingFolder] {
-        guard let data = try? Data(contentsOf: foldersFile) else { return [] }
+        guard let data = try? FilePersistence.read(foldersFile) else { return [] }
         return (try? decoder.decode([MeetingFolder].self, from: data)) ?? []
     }
 
     private func writeFolders(_ folders: [MeetingFolder]) throws {
         let data = try encoder.encode(folders)
-        try data.write(to: foldersFile, options: .atomic)
+        try FilePersistence.write(data, to: foldersFile)
     }
 
     private func loadRules() -> [FolderTitleRule] {
-        guard let data = try? Data(contentsOf: rulesFile) else { return [] }
+        guard let data = try? FilePersistence.read(rulesFile) else { return [] }
         return (try? decoder.decode([FolderTitleRule].self, from: data)) ?? []
     }
 
     private func writeRules(_ rules: [FolderTitleRule]) throws {
         let data = try encoder.encode(rules)
-        try data.write(to: rulesFile, options: .atomic)
+        try FilePersistence.write(data, to: rulesFile)
     }
 }

@@ -63,7 +63,8 @@ private struct GeneralSettings: View {
     @AppStorage(SettingsKey.developerMode) private var developerMode = false
     @AppStorage(SettingsKey.crashDiagnostics) private var crashDiagnostics = false
     @State private var launchAtLogin = LaunchAtLogin.isOn
-    @State private var systemAudioStatus = SystemAudioPermission.status()
+    @State private var requestingSystemAudio = false
+    @State private var systemAudioError: String?
     @State private var accessibilityTrusted = AccessibilityPermission.isTrusted
     @State private var showResetConfirm = false
 
@@ -150,23 +151,13 @@ private struct GeneralSettings: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    switch systemAudioStatus {
-                    case .unknown:
-                        Button("Grant…") {
-                            Task {
-                                await SystemAudioPermission.request()
-                                systemAudioStatus = SystemAudioPermission.status()
-                            }
-                        }
+                    Button("Request access", action: requestSystemAudio)
                         .controlSize(.small)
-                    case .denied:
-                        Button("Open Settings") {
-                            NSWorkspace.shared.open(SystemAudioPermission.privacySettingsURL)
-                        }
-                        .controlSize(.small)
-                    case .authorized:
-                        EmptyView()
+                        .disabled(requestingSystemAudio)
+                    Button("Open Settings") {
+                        NSWorkspace.shared.open(SystemAudioPermission.privacySettingsURL)
                     }
+                    .controlSize(.small)
                 }
                 HStack(alignment: .firstTextBaseline) {
                     StatusDot(ok: accessibilityTrusted)
@@ -270,12 +261,10 @@ private struct GeneralSettings: View {
         .onAppear {
             micStatus = MicRecorder.permissionGranted
             launchAtLogin = LaunchAtLogin.isOn
-            systemAudioStatus = SystemAudioPermission.status()
             accessibilityTrusted = AccessibilityPermission.isTrusted
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             micStatus = MicRecorder.permissionGranted
-            systemAudioStatus = SystemAudioPermission.status()
             accessibilityTrusted = AccessibilityPermission.isTrusted
         }
     }
@@ -286,26 +275,19 @@ private struct GeneralSettings: View {
             : "Optional — labels Zoom speakers by name. Click Grant, then enable Nutola under Accessibility."
     }
 
-    private var systemAudioOK: Bool? {
-        if systemAudioStatus == .authorized { return true }
-        if systemAudioStatus == .denied { return false }
-        return nil
-    }
+    private var systemAudioOK: Bool? { nil }
 
     private var systemAudioSettingsDetail: String {
-        if systemAudioConfirmed, systemAudioStatus != .authorized {
-            return "Previously captured call audio, but macOS no longer shows an active grant — click Grant to re-allow."
-        }
-        if systemAudioConfirmed {
-            return "Records the other participants. Confirmed capturing audio in a previous recording."
-        }
-        switch systemAudioStatus {
-        case .authorized:
-            return "Allowed — records the other participants on calls."
-        case .denied:
-            return "Denied — enable Nutola under System Audio Recording Only in Settings."
-        case .unknown:
-            return "Records the other participants. Click Grant — macOS will ask to allow system audio recording."
+        systemAudioError ?? SystemAudioPermission.guidance(previouslyCaptured: systemAudioConfirmed)
+    }
+
+    private func requestSystemAudio() {
+        requestingSystemAudio = true
+        systemAudioError = nil
+        Task {
+            defer { requestingSystemAudio = false }
+            do { try await SystemAudioPermission.request() }
+            catch { systemAudioError = error.localizedDescription }
         }
     }
 
@@ -1052,10 +1034,12 @@ private struct TemplateSettings: View {
                         while templates.contains(where: { $0.name == name }) {
                             name = "New Template \(n)"; n += 1
                         }
-                        try? app.templates.save(SummaryTemplate(
-                            name: name,
-                            body: "# {{title}}\n\n## Highlights\nWhat mattered most.\n"))
-                        reload(select: name)
+                        do {
+                            try app.templates.save(SummaryTemplate(
+                                name: name,
+                                body: "# {{title}}\n\n## Highlights\nWhat mattered most.\n"))
+                            reload(select: name)
+                        } catch { saveError = error.localizedDescription }
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -1379,7 +1363,7 @@ private struct DebugSettings: View {
         panel.nameFieldStringValue = "nutola-logs-\(Int(Date().timeIntervalSince1970)).txt"
         panel.allowedContentTypes = [.plainText]
         if panel.runModal() == .OK, let url = panel.url {
-            try? text.write(to: url, atomically: true, encoding: .utf8)
+            try? FilePersistence.write(Data(text.utf8), to: url)
         }
     }
 

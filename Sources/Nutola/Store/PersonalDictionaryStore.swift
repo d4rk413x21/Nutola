@@ -137,8 +137,9 @@ final class PersonalDictionaryStore: ObservableObject {
     // MARK: - Persistence
 
     private func persist() {
-        if let data = try? JSONEncoder().encode(entries) {
+        do {
+            let data = try JSONEncoder().encode(entries)
             defaults.set(data, forKey: key)
-        }
+        } catch { PersistenceStatus.record(error) }
     }
 }

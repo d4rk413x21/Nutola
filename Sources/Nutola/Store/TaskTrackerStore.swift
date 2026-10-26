@@ -412,10 +412,12 @@ final class TaskTrackerStore: ObservableObject {
 
     private func persist() {
         objectWillChange.send()
-        let taskData = try? JSONEncoder().encode(tasks)
-        defaults.set(taskData, forKey: key)
-        let aliasData = try? JSONEncoder().encode(aliases)
-        defaults.set(aliasData, forKey: aliasKey)
+        do {
+            let taskData = try JSONEncoder().encode(tasks)
+            let aliasData = try JSONEncoder().encode(aliases)
+            defaults.set(taskData, forKey: key)
+            defaults.set(aliasData, forKey: aliasKey)
+        } catch { PersistenceStatus.record(error) }
     }
 
     private static func loadTasks(

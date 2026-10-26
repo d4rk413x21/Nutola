@@ -547,7 +547,8 @@ final class LiveTranscriber: @unchecked Sendable {
   /// live transcription simply skips those; the batch pass still has them.
   static func copy(_ buffer: AVAudioPCMBuffer) -> sending AVAudioPCMBuffer? {
     guard buffer.frameLength > 0,
-      let out = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: buffer.frameLength),
+      let format = AVAudioFormat(streamDescription: buffer.format.streamDescription),
+      let out = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: buffer.frameLength),
       let src = buffer.floatChannelData, let dst = out.floatChannelData
     else { return nil }
     out.frameLength = buffer.frameLength

@@ -31,10 +31,13 @@ extension SharedStateTests {
             let old = chat.beginResponse()
             chat.cancelResponse(old)
             let current = chat.beginResponse()
-            #expect(!(chat.updateResponse(old, text: "Old answer")))
-            #expect(!(chat.cancelResponse(old)))
+            let updatedOld = chat.updateResponse(old, text: "Old answer")
+            #expect(!updatedOld)
+            let cancelledOld = chat.cancelResponse(old)
+            #expect(!cancelledOld)
             #expect(chat.isAnswering)
-            #expect(chat.updateResponse(current, text: "Correct answer", finished: true))
+            let updatedCurrent = chat.updateResponse(current, text: "Correct answer", finished: true)
+            #expect(updatedCurrent)
             #expect(!(chat.isAnswering))
             #expect(chat.messages.map(\.text) == ["Correct answer"])
         }
@@ -43,7 +46,8 @@ extension SharedStateTests {
             var chat = AskConversation()
             let id = chat.beginResponse()
             chat.updateResponse(id, text: "Final", finished: true)
-            #expect(!(chat.updateResponse(id, text: "Late partial")))
+            let accepted = chat.updateResponse(id, text: "Late partial")
+            #expect(!accepted)
             #expect(chat.messages.first?.text == "Final")
         }
 
@@ -54,11 +58,13 @@ extension SharedStateTests {
             let current = download.start()
             download.update(old, fraction: 1)
             #expect(download.progress == 0)
-            #expect(!(download.finish(old)))
+            let finishedOld = download.finish(old)
+            #expect(!finishedOld)
             #expect(download.isRunning)
             download.update(current, fraction: 0.4)
             #expect(download.progress == 0.4)
-            #expect(download.finish(current))
+            let finishedCurrent = download.finish(current)
+            #expect(finishedCurrent)
             #expect(!(download.isRunning))
         }
 
@@ -165,10 +171,7 @@ extension SharedStateTests {
             }
             let transcripts = meetings.map { ($0.id, segments) }
             let people = meetings.map { ($0.id, speakers) }
-            var summaries: [SpeakerTalkTimeSummary] = []
-            measure {
-                summaries = TalkTimeAggregator.aggregate(meetings: meetings, transcripts: transcripts, speakers: people)
-            }
+            let summaries = TalkTimeAggregator.aggregate(meetings: meetings, transcripts: transcripts, speakers: people)
             #expect(summaries.count == 101)
             #expect(summaries.first(where: { $0.name == "Alice" })?.totalTalkTime == 50_000)
         }

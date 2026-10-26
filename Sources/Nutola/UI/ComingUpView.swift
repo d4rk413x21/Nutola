@@ -271,7 +271,8 @@ struct ComingUpView: View {
             .font(.nutola(12))
             .foregroundStyle(Theme.secondary(scheme))
         }
-        .frame(width: 96, alignment: .leading)
+        .fixedSize(horizontal: true, vertical: false)
+        .frame(minWidth: 96, alignment: .leading)
     }
 
     private var timelineDivider: some View {

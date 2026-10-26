@@ -44,6 +44,10 @@ enum MeetingNotice {
 
     static func presentation(for notice: String?) -> Presentation? {
         guard let notice, !notice.isEmpty else { return nil }
+        if notice.contains("audio could not be saved") {
+            return Presentation(title: "Incomplete audio recording", message: notice,
+                                systemImage: "exclamationmark.triangle", isEmptyTranscript: false)
+        }
 
         let parts = notice.split(separator: " ").map(String.init)
         let micFailed = parts.contains(micTranscriptionFailed)

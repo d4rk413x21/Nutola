@@ -489,7 +489,7 @@ final class RecordingSession: ObservableObject {
     }
     if (platformTrackingWanted ?? Self.isZoom(sourceApp)), !AccessibilityPermission.isTrusted {
       parts.append(
-        "Enable Accessibility for Nutola in Privacy & Security to label Zoom speakers by name.")
+        "Enable Accessibility for Nutola in Privacy & Security to identify meeting speakers by name.")
     }
     return parts.isEmpty ? nil : parts.joined(separator: " ")
   }

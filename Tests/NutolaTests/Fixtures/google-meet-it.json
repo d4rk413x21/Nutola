@@ -30,31 +30,31 @@
               "children": [
                 {
                   "role": "AXStaticText",
-                  "value": "Testo di prova."
+                  "value": "Questa"
                 },
                 {
                   "role": "AXStaticText",
-                  "value": "Testo di prova."
+                  "value": "è"
                 },
                 {
                   "role": "AXStaticText",
-                  "value": "Testo di prova."
+                  "value": "una"
                 },
                 {
                   "role": "AXStaticText",
-                  "value": "Testo di prova."
+                  "value": "frase"
                 },
                 {
                   "role": "AXStaticText",
-                  "value": "Testo di prova."
+                  "value": "di"
                 },
                 {
                   "role": "AXStaticText",
-                  "value": "Testo di prova."
+                  "value": "prova"
                 },
                 {
                   "role": "AXStaticText",
-                  "value": "Testo di prova."
+                  "value": "anonima."
                 }
               ]
             }

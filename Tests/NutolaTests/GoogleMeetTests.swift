@@ -28,7 +28,7 @@ final class GoogleMeetTests: XCTestCase {
         let parsed = try XCTUnwrap(GoogleMeetSnapshot.parse(fixture(), roomCode: code))
         XCTAssertEqual(parsed.participants, [PlatformParticipant(name: "Local User", isLocal: true)])
         XCTAssertEqual(parsed.captions.map(\.name), ["Tu"])
-        XCTAssertEqual(parsed.captions.first?.text, "Testo di prova.")
+        XCTAssertEqual(parsed.captions.first?.text, "Questa è una frase di prova anonima.")
         XCTAssertTrue(parsed.captions.first?.isLocal == true)
         XCTAssertTrue(parsed.captionsEnabled)
     }

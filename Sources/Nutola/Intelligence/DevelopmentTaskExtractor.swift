@@ -98,7 +98,7 @@ enum DevelopmentTaskExtractor {
     static func extract(
         meeting: Meeting,
         transcript: [TranscriptSegment],
-        analyze: (String, String) async throws -> String,
+        analyze: @MainActor (String, String) async throws -> String,
         onProgress: @MainActor (Int, Int) -> Void = { _, _ in }
     ) async throws -> DevelopmentTaskReview {
         let parts = chunks(transcript)

@@ -159,6 +159,7 @@ struct ConferenceJoinButton: View {
 }
 
 struct RecordDot: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.nutolaActionColor) private var actionColor
     @State private var pulsing = false
 
@@ -166,9 +167,11 @@ struct RecordDot: View {
         Circle()
             .fill(actionColor)
             .frame(width: 10, height: 10)
-            .opacity(pulsing ? 0.35 : 1)
-            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulsing)
-            .onAppear { pulsing = true }
+            .opacity(!reduceMotion && pulsing ? 0.35 : 1)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulsing)
+            .onAppear { pulsing = !reduceMotion }
+            .onChange(of: reduceMotion) { pulsing = !reduceMotion }
+            .accessibilityHidden(true)
     }
 }
 

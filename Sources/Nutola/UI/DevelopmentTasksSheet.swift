@@ -54,6 +54,7 @@ struct DevelopmentTasksSheet: View {
                 }
                 .disabled(busy || loadFailed)
                 .keyboardShortcut(.defaultAction)
+                .buttonStyle(.borderedProminent)
                 if hasChanges && !busy {
                     Button("Discard changes") { confirmDiscard = true }
                         .keyboardShortcut(.cancelAction)
@@ -130,7 +131,7 @@ struct DevelopmentTasksSheet: View {
             }
         }
         .padding(24)
-        .frame(width: 760, height: 680)
+        .frame(minWidth: 680, idealWidth: 800, minHeight: 540, idealHeight: 700)
         .interactiveDismissDisabled(busy)
         .trackingEdits(isDirty: { hasChanges }, save: save, discard: { review = savedReview })
         .dismissalConfirmationDialog("Discard unsaved task edits?", shouldPresent: hasChanges) {

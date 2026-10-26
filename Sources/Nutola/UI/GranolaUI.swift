@@ -13,7 +13,8 @@ struct GranolaChip: View {
     HStack(spacing: 5) {
       if let icon {
         Image(systemName: icon)
-          .font(.system(size: 9, weight: .semibold))
+          .font(.system(size: 10, weight: .semibold))
+          .accessibilityHidden(true)
       }
       Text(text)
         .font(.nutola(11, .medium))
@@ -26,6 +27,7 @@ struct GranolaChip: View {
     .overlay {
       Capsule().strokeBorder(Color.primary.opacity(scheme == .dark ? 0.08 : 0.06), lineWidth: 1)
     }
+    .accessibilityElement(children: .combine)
   }
 }
 
@@ -91,15 +93,7 @@ struct GranolaFloatingPanel: View {
       }
     }
     .frame(maxWidth: 560)
-    .background(
-      Theme.panel(scheme),
-      in: RoundedRectangle(cornerRadius: isExpanded ? 20 : 28)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: isExpanded ? 20 : 28)
-        .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
-    }
-    .shadow(color: .black.opacity(scheme == .dark ? 0.45 : 0.12), radius: 24, y: 8)
+    .floatingSurface(in: RoundedRectangle(cornerRadius: isExpanded ? 20 : 28), opaque: isExpanded)
     .padding(.horizontal, 24)
     .padding(.bottom, 16)
     // Respect "Reduce Motion": skip the spring when the user has it enabled.

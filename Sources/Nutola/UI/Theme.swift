@@ -1,21 +1,15 @@
 import AppKit
 import SwiftUI
 
-/// Nutola palette — Medium-inspired light mode (cream, green, near-black) layered over the
-/// dessert dark mode (raspberry, honey, blueberry, mint).
+/// Semantic macOS surfaces and text, with Nutola's configurable action palette.
 enum Theme {
     static let defaultActionColorHex = "#1A8917"
 
-    static let cream = Color(red: 0.976, green: 0.969, blue: 0.957)          // #F9F7F4 Medium page
-    /// Card/panel surface — Medium's white (#FFFFFF). Kept fully opaque white
-    /// (rather than a deeper cream) so cards stay readable over the `cream`
-    /// page background in light mode; `creamDeep` is a name, not a darker shade.
-    static let creamDeep = Color(red: 1.00, green: 1.00, blue: 1.00)         // #FFFFFF Medium cards
+    static let cream = Color(red: 0.976, green: 0.969, blue: 0.957)          // #F9F7F4 brand mark
     static let raspberry = Color(red: 0.878, green: 0.224, blue: 0.420)     // #E0396B (preset)
     static let honey = Color(red: 0.949, green: 0.663, blue: 0.231)         // #F2A93B secondary
     static let blueberry = Color(red: 0.353, green: 0.416, blue: 0.812)     // #5A6ACF chat/links
     static let mint = Color(red: 0.247, green: 0.698, blue: 0.498)          // #3FB27F recording
-    static let cocoa = Color(red: 0.141, green: 0.141, blue: 0.161)         // #242429 Medium ink
     static let mediumGreen = Color(red: 0.102, green: 0.537, blue: 0.090)   // #1A8917 Medium accent
 
     static let cornerRadius: CGFloat = 16
@@ -27,17 +21,17 @@ enum Theme {
         Color(hex: AppSettings.actionColorHex) ?? mediumGreen
     }
 
-    /// Card background — Medium white in light mode, warm-dark in dark mode.
+    /// Opaque document and card surfaces keep long text readable.
     static func surface(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.09, green: 0.09, blue: 0.09) : cream
+        Color(nsColor: .windowBackgroundColor)
     }
     static func card(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.17, green: 0.17, blue: 0.17) : creamDeep
+        Color(nsColor: .controlBackgroundColor)
     }
 
-    /// Floating panel and transcript overlay surfaces (Granola-style).
+    /// Expanded readers use an opaque surface beneath their controls.
     static func panel(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.16, green: 0.16, blue: 0.16) : creamDeep
+        Color(nsColor: .windowBackgroundColor)
     }
 
     static func bubble(_ scheme: ColorScheme, isSelf: Bool) -> Color {
@@ -59,9 +53,7 @@ enum Theme {
 
     /// Primary text — titles, meeting names, body copy.
     static func heading(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color(red: 0.97, green: 0.95, blue: 0.93)
-            : cocoa
+        Color(nsColor: .labelColor)
     }
 
     static func ink(_ scheme: ColorScheme) -> Color { heading(scheme) }
@@ -71,17 +63,12 @@ enum Theme {
         accent.accentText(on: scheme)
     }
 
-    /// Secondary metadata — boosted in dark mode so it doesn't disappear on brown surfaces.
     static func secondary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color(red: 0.72, green: 0.68, blue: 0.64)
-            : Color(red: 0.42, green: 0.42, blue: 0.42)   // #6B6B6B Medium gray
+        Color(nsColor: .secondaryLabelColor)
     }
 
     static func tertiary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark
-            ? Color(red: 0.58, green: 0.54, blue: 0.50)
-            : Color(red: 0.54, green: 0.54, blue: 0.54)   // #8A8A8A Medium gray
+        Color(nsColor: .tertiaryLabelColor)
     }
 
     static func honey(_ scheme: ColorScheme) -> Color {
@@ -250,6 +237,7 @@ struct NutolaAppearanceModifier: ViewModifier {
         content
             .preferredColorScheme(AppearanceMode(rawValue: appearanceMode)?.colorScheme)
             .environment(\.nutolaActionColor, action)
+            .tint(action)
     }
 }
 
@@ -267,11 +255,8 @@ extension View {
 
 extension Font {
     static func nutola(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
+        .system(size: size, weight: weight)
     }
 
-    /// Editorial title — Granola-style meeting headings.
-    static func granolaTitle(_ size: CGFloat = 32) -> Font {
-        .system(size: size, weight: .regular, design: .serif)
-    }
+
 }

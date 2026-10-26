@@ -751,16 +751,17 @@ private struct RecordingPillPanelView: View {
     .padding(.vertical, 12)
     .padding(.horizontal, 8)
     .frame(width: RecordingPillLayout.width)
-    .background(Theme.surface(scheme), in: Capsule())
-    .overlay(Capsule().strokeBorder(.primary.opacity(0.10)))
-    .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+    .floatingSurface(in: Capsule())
     .overlay { PillHandleArea(onClick: { minimized.toggle() }) }
     .help(minimized ? "Expand live transcript" : "Minimize")
     .accessibilityElement(children: .combine)
     .accessibilityLabel("Live recording")
+    .accessibilityValue(minimized ? "Collapsed" : "Expanded")
+    .accessibilityAddTraits(.isButton)
     .accessibilityAction(named: Text("Expand or minimize transcript")) { minimized.toggle() }
     .focusable()
     .onKeyPress(.return) { minimized.toggle(); return .handled }
+    .onKeyPress(.space) { minimized.toggle(); return .handled }
   }
 }
 
@@ -799,25 +800,25 @@ private struct RecordingExpandedCardView: View {
         Text(notice).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
       }
       transcript
-      HStack(spacing: 8) {
-        Button(action: onAsk) {
-          Label("Ask AI live", systemImage: "sparkles")
-            .font(.nutola(12, .semibold))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 2)
+      GlassEffectContainer(spacing: 8) {
+        HStack(spacing: 8) {
+          Button(action: onAsk) {
+            Label("Ask AI live", systemImage: "sparkles")
+              .font(.nutola(12, .semibold))
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 2)
+          }
+          .buttonStyle(.glassProminent)
+          .tint(actionColor)
+          Button("Stop", action: onStop)
+            .font(.nutola(12))
+            .buttonStyle(.glass)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(actionColor)
-        Button("Stop", action: onStop)
-          .font(.nutola(12))
-          .buttonStyle(.bordered)
       }
     }
     .padding(12)
     .frame(width: 300, alignment: .leading)
-    .background(Theme.surface(scheme), in: RoundedRectangle(cornerRadius: 14))
-    .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(.primary.opacity(0.08)))
-    .shadow(color: .black.opacity(0.22), radius: 12, y: 6)
+    .floatingSurface(in: RoundedRectangle(cornerRadius: 16), opaque: true)
     .padding(.top, RecordingPillLayout.cardInset)
     .padding(.leading, RecordingPillLayout.cardInset)
     .padding(.bottom, RecordingPillLayout.cardInset)

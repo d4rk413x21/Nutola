@@ -58,10 +58,7 @@ struct MeetingDetailView: View {
                     SideNotesResizeHandle(width: $sideNotesWidth)
                 }
 
-                VStack(spacing: 0) {
-                    topChrome
-                    documentScroll
-                }
+                documentScroll
             }
 
             GranolaFloatingPanel(
@@ -70,6 +67,8 @@ struct MeetingDetailView: View {
                 transcriptDraft: $transcriptDraft)
         }
         .background(Theme.surface(scheme))
+        .navigationTitle(meeting.title)
+        .toolbar { meetingToolbar }
         .safeAreaInset(edge: .bottom) {
             if showProminentJoinButton, let join = joinConference {
                 VStack(spacing: 8) {
@@ -195,62 +194,37 @@ struct MeetingDetailView: View {
         }
     }
 
-    // MARK: - Chrome
+    // MARK: - Window toolbar
 
-    private var topChrome: some View {
-        HStack {
+    @ToolbarContentBuilder
+    private var meetingToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
             if let onBack {
-                Button(action: onBack) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text(backTitle ?? "Back")
-                            .font(.nutola(13, .medium))
-                    }
-                    .foregroundStyle(Theme.secondary(scheme))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                Button("Back to \(backTitle ?? "previous view")", systemImage: "chevron.left", action: onBack)
+                    .labelStyle(.iconOnly)
+                    .help("Back to \(backTitle ?? "previous view")")
             }
-            Spacer()
-            if case .done = publishState {
-                GranolaChip(icon: "checkmark.circle.fill", text: "Shared", accent: Theme.mint(scheme))
-            }
-            Button {
-                showDevelopmentTasks = true
-            } label: {
-                Label("Development tasks", systemImage: "checklist")
-            }
-            .buttonStyle(.borderless)
-            .disabled(isRecordingThisMeeting || meeting.state == .processing)
-            Button {
-                copyTranscript()
-            } label: {
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.secondary(scheme))
-            }
-            .buttonStyle(.plain)
-            .help("Copy transcript")
-            .accessibilityLabel("Copy transcript")
-            .disabled(app.store.transcript(for: meeting.id).isEmpty)
-            Button {
-                showShareNotes = true
-            } label: {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 14))
-                    .foregroundStyle(Theme.secondary(scheme))
-            }
-            .buttonStyle(.plain)
-            .help("Share notes")
-            .accessibilityLabel("Share notes")
+        }
+        ToolbarItemGroup(placement: .primaryAction) {
+            Button("Development tasks", systemImage: "checklist") { showDevelopmentTasks = true }
+                .labelStyle(.iconOnly)
+                .disabled(isRecordingThisMeeting || meeting.state == .processing)
+                .help("Review development tasks and create Linear issues")
+            Button("Copy transcript", systemImage: "doc.on.doc", action: copyTranscript)
+                .labelStyle(.iconOnly)
+                .disabled(app.store.transcript(for: meeting.id).isEmpty)
+                .help("Copy transcript")
+            Button("Share notes", systemImage: "square.and.arrow.up") { showShareNotes = true }
+                .labelStyle(.iconOnly)
+                .help("Share notes")
             publishMenu
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
+        if case .done = publishState {
+            ToolbarItem(placement: .status) {
+                Label("Shared", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     private var shouldCenterEmptyNotes: Bool {
@@ -286,9 +260,9 @@ struct MeetingDetailView: View {
         VStack(spacing: 14) {
             TextField("Meeting title", text: $title, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.granolaTitle(30))
+                .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(Theme.heading(scheme))
-                .multilineTextAlignment(.center)
+                .multilineTextAlignment(.leading)
                 .lineLimit(3)
                 .focused($isEditingTitle)
                 .onSubmit { saveTitle() }
@@ -296,8 +270,8 @@ struct MeetingDetailView: View {
 
             metadataChips
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 16)
     }
 
     private var metadataChips: some View {
@@ -368,7 +342,7 @@ struct MeetingDetailView: View {
                 GranolaChip(icon: nil, text: stage, accent: Theme.honey(scheme))
             }
         }
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -980,13 +954,13 @@ struct MeetingDetailView: View {
             if publishState == .working {
                 ProgressView().controlSize(.small)
             } else {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.secondary(scheme))
+                Label("More actions", systemImage: "ellipsis")
             }
         }
         .menuStyle(.borderlessButton)
-        .fixedSize()
+        .labelStyle(.iconOnly)
+        .help("More actions")
+        .accessibilityLabel("More actions")
     }
 
     @discardableResult

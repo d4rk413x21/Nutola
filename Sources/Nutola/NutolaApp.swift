@@ -30,7 +30,8 @@ struct NutolaApp: App {
                 .environmentObject(app)
                 .nutolaAppearance()
         }
-        .defaultSize(width: 980, height: 640)
+        .defaultSize(width: 1_100, height: 760)
+        .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(openMainAtLaunch ? .presented : .suppressed)
         .restorationBehavior(.disabled)
         .commands {

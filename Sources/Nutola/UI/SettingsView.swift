@@ -41,7 +41,7 @@ struct SettingsView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .frame(width: 800, height: 560)
+        .frame(minWidth: 720, idealWidth: 800, minHeight: 500, idealHeight: 620)
         .onChange(of: developerMode) { selection = .general }
     }
 }

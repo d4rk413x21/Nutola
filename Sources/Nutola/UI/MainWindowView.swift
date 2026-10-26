@@ -11,8 +11,6 @@ enum SidebarItem: Hashable {
 
 struct MainWindowView: View {
     @EnvironmentObject private var app: AppState
-    @Environment(\.colorScheme) private var scheme
-    @Environment(\.nutolaActionColor) private var actionColor
     @State private var selection: SidebarItem? = .home
     @State private var presentedMeetingID: UUID?
     @State private var showNewFolder = false
@@ -25,7 +23,7 @@ struct MainWindowView: View {
         } detail: {
             detail
         }
-        .background(Theme.surface(scheme))
+        .frame(minWidth: 780, minHeight: 540)
         .onAppear { adoptPendingSelection() }
         .onChange(of: app.openMeetingID) { adoptPendingSelection() }
         .dismissalConfirmationDialog("Discard unsaved changes?", shouldPresent: edits.hasChanges) {
@@ -84,8 +82,7 @@ struct MainWindowView: View {
             foldersSection
         }
         .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
-        .background(Theme.surface(scheme))
+        .navigationTitle("Nutola")
         .safeAreaInset(edge: .bottom) {
             if let session = app.session {
                 SidebarRecordingStrip(session: session)
@@ -102,29 +99,11 @@ struct MainWindowView: View {
         }
     }
 
-    /// #23 — A sidebar row with a rounded background highlight when selected,
-    /// so the active destination stands out more than the default subtle tint.
-    @ViewBuilder
     private func sidebarRow(_ item: SidebarItem, label: String, icon: String) -> some View {
-        let isSelected = selection == item
         Label(label, systemImage: icon)
-            .font(.nutola(13, .medium))
-            .foregroundStyle(isSelected ? Theme.heading(scheme) : Theme.secondary(scheme))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(actionColor.opacity(0.12))
-                } else {
-                    Color.clear
-                }
-            }
+            .font(.body)
+            .symbolRenderingMode(.monochrome)
             .tag(item)
-            // Clear the List's default selection tint — we draw our own above.
-            // Without this, .sidebar style stacks its highlight on ours.
-            .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
     }
 
     private var foldersSection: some View {
@@ -271,6 +250,7 @@ private struct FolderSidebarRow: View {
 }
 
 private struct SidebarRecordingStrip: View {
+    @Environment(\.colorScheme) private var scheme
     @ObservedObject var session: RecordingSession
     @EnvironmentObject private var app: AppState
     @Environment(\.nutolaActionColor) private var actionColor
@@ -286,8 +266,9 @@ private struct SidebarRecordingStrip: View {
                 .tint(actionColor)
                 .controlSize(.small)
         }
+        .padding(12)
+        .background(Theme.card(scheme), in: RoundedRectangle(cornerRadius: 12))
         .padding(10)
-        .background(.thinMaterial)
     }
 
     private func timeString(_ t: TimeInterval) -> String {

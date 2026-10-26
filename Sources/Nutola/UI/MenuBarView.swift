@@ -103,6 +103,7 @@ struct MenuBarView: View {
                     .buttonStyle(.plain)
                     .onHover { powerHovering = $0 }
                     .help("Quit Nutola")
+                    .accessibilityLabel("Quit Nutola")
                 }
         }
         }

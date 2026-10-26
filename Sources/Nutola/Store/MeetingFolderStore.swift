@@ -48,12 +48,13 @@ final class MeetingFolderStore: ObservableObject {
     }
 
     func deleteFolder(id: UUID, meetingRepository: MeetingRepository) {
-        for meeting in meetingRepository.meetings where meeting.folderID == id {
+        let members = meetingRepository.meetings.filter { $0.folderID == id }
+        for meeting in members {
             var m = meeting
             m.folderID = nil
             meetingRepository.upsert(m)
         }
-        guard !meetingRepository.meetings.contains(where: { meeting in
+        guard !members.contains(where: { meeting in
             FilePersistence.failures.keys.contains(meetingRepository.archive.folder(for: meeting.id).appendingPathComponent("meeting.json"))
         }) else { return }
         do { try archive.deleteFolder(id: id) }

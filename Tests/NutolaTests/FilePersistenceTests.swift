@@ -90,4 +90,15 @@ final class FilePersistenceTests: XCTestCase {
         XCTAssertTrue(text.contains("does not expose the current permission"))
         XCTAssertFalse(SystemAudioPermission.guidance(previouslyCaptured: false).contains("previous recording"))
     }
+
+    func testEncodingFailureDoesNotErasePreviouslySavedTasks() throws {
+        let suite = "nutola-task-encoding-\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = TaskTrackerStore(defaults: defaults)
+        store.add(text: "Saved task")
+        let previous = try XCTUnwrap(defaults.data(forKey: SettingsKey.taskTracker))
+        store.add(text: "Invalid date", createdAt: Date(timeIntervalSince1970: .infinity))
+        XCTAssertEqual(defaults.data(forKey: SettingsKey.taskTracker), previous)
+    }
 }

@@ -123,6 +123,7 @@ struct ConferenceJoinButton: View {
             }
             .buttonStyle(.plain)
             .background(Theme.blueberry(scheme), in: RoundedRectangle(cornerRadius: 6))
+            .accessibilityLabel("Join meeting and start recording")
             .disabled(app.isRecording)
             .help(app.isRecording
                   ? "A recording is already in progress"
@@ -144,6 +145,7 @@ struct ConferenceJoinButton: View {
                            height: prominent ? 32 : 24)
                     .contentShape(Rectangle())
             }
+            .accessibilityLabel("Meeting join and recording options")
             .menuIndicator(.hidden)
             .menuStyle(.borderlessButton)
             .fixedSize()

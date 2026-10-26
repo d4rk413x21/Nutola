@@ -105,6 +105,7 @@ struct FolderDetailView: View {
                     }
                     .buttonStyle(.plain)
                     .help("Edit folder")
+                    .accessibilityLabel("Edit folder")
                 }
                 TextField("Folder name", text: $name)
                     .textFieldStyle(.plain)

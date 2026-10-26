@@ -242,19 +242,18 @@ struct GranolaFloatingPanel: View {
             }
             .buttonStyle(.plain)
             .help("Clear search")
+            .accessibilityLabel("Clear search")
           }
         } else {
-          Text("Transcript")
+          Button("Transcript", action: presentTranscriptSearch)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Search transcript")
             .font(.nutola(12, .semibold))
             .foregroundStyle(Theme.secondary(scheme))
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
-      .onTapGesture {
-        guard !searching else { return }
-        presentTranscriptSearch()
-      }
       .help(searching ? "Search transcript" : "Search transcript (click to open)")
 
       if isLive, let session = app.session {
@@ -270,6 +269,7 @@ struct GranolaFloatingPanel: View {
         }
         .buttonStyle(.plain)
         .help("Copy transcript")
+        .accessibilityLabel("Copy transcript")
       }
       collapseButton
     }
@@ -317,6 +317,7 @@ struct GranolaFloatingPanel: View {
             }
             .buttonStyle(.plain)
             .help("Clear the question")
+            .accessibilityLabel("Clear the question")
           }
         }, title: nil)
 
@@ -500,6 +501,7 @@ struct GranolaFloatingPanel: View {
     .buttonStyle(.plain)
     .padding(.trailing, -12)
     .help("Collapse panel")
+    .accessibilityLabel("Collapse panel")
   }
 
   private var askInputBar: some View {

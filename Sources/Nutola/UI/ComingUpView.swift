@@ -146,6 +146,7 @@ struct ComingUpView: View {
             .buttonStyle(.plain)
             .foregroundStyle(Theme.blueberry)
             .help("Unarchive")
+            .accessibilityLabel("Unarchive")
         }
         .padding(.vertical, 2)
         .contextMenu {

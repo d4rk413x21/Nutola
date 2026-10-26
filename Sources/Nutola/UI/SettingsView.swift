@@ -444,6 +444,7 @@ private struct CalendarSettings: View {
                                 .buttonStyle(.plain)
                                 .foregroundStyle(Theme.blueberry)
                                 .help("Unarchive series")
+                                .accessibilityLabel("Unarchive series")
                             }
                             .contentShape(Rectangle())
                             .onTapGesture(count: 2) {
@@ -465,6 +466,7 @@ private struct CalendarSettings: View {
                                 .buttonStyle(.plain)
                                 .foregroundStyle(Theme.blueberry)
                                 .help("Unarchive event")
+                                .accessibilityLabel("Unarchive event")
                             }
                             .contentShape(Rectangle())
                             .onTapGesture(count: 2) {
@@ -899,6 +901,7 @@ private struct IntelligenceSettings: View {
                             }
                             .buttonStyle(.plain)
                             .help("Copy the claude mcp add command")
+                            .accessibilityLabel("Copy the claude mcp add command")
                         }
                         Text("Or add the \"nutola\" entry to Claude Desktop's config (merge into any existing \"mcpServers\"):")
                             .font(.nutola(11))
@@ -954,6 +957,7 @@ private struct IntelligenceSettings: View {
                             }
                             .buttonStyle(.plain)
                             .help("Copy the codex mcp add command")
+                            .accessibilityLabel("Copy the codex mcp add command")
                         }
                         Button("Reveal config in Finder") {
                             NSWorkspace.shared.activateFileViewerSelecting([codexConfigURL])
@@ -1044,6 +1048,7 @@ private struct TemplateSettings: View {
                         Image(systemName: "plus")
                     }
                     .help("New template")
+                    .accessibilityLabel("New template")
                     Button {
                         guard let selected else {
                             NutolaConsoleLog.app("[TemplateSettings] delete: no selection")
@@ -1064,12 +1069,14 @@ private struct TemplateSettings: View {
                     }
                     .disabled(selected == nil)
                     .help("Delete template")
+                    .accessibilityLabel("Delete template")
                     Button {
                         aiError = nil; showAISheet = true
                     } label: {
                         Image(systemName: "sparkles")
                     }
                     .help("Generate template with AI")
+                    .accessibilityLabel("Generate template with AI")
                     Spacer()
                 }
                 .buttonStyle(.plain)
@@ -1106,6 +1113,7 @@ private struct TemplateSettings: View {
                         .buttonStyle(.bordered)
                         .tint(actionColor)
                         .help("Generate a new template with AI")
+                        .accessibilityLabel("Generate a new template with AI")
                         Button("Save") { save() }
                             .buttonStyle(.borderedProminent)
                             .tint(actionColor)
@@ -1298,6 +1306,8 @@ private struct AppearanceSettings: View {
                         }
                         .buttonStyle(.plain)
                         .help(preset.name)
+                        .accessibilityLabel("Action color: \(preset.name)")
+                        .accessibilityValue(actionColorHex.uppercased() == preset.rawValue ? "Selected" : "Not selected")
                     }
                 }
 
@@ -1317,6 +1327,7 @@ private struct AppearanceSettings: View {
                         }
                         .controlSize(.small)
                         .help("Reset the action color to the default Medium green")
+                        .accessibilityLabel("Reset the action color to the default Medium green")
                     }
                 }
                 Text("Used for Record, Save, and other prominent buttons. Adjusted automatically for readable labels in each theme.")

@@ -88,6 +88,7 @@ struct MeetingInsightsView: View {
                 Image(systemName: "chevron.left")
             }
             .help("Previous week")
+            .accessibilityLabel("Previous week")
             .disabled(false)
 
             Button {
@@ -97,6 +98,7 @@ struct MeetingInsightsView: View {
                     .font(.nutola(12, .medium))
             }
             .help("Jump to current week")
+            .accessibilityLabel("Jump to current week")
 
             Button {
                 stepWeek(by: 1)
@@ -104,6 +106,7 @@ struct MeetingInsightsView: View {
                 Image(systemName: "chevron.right")
             }
             .help("Next week")
+            .accessibilityLabel("Next week")
             .disabled(isNextDisabled)
         }
         .buttonStyle(.borderless)

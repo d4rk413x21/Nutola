@@ -641,6 +641,7 @@ private struct DetectionPromptView: View {
     .buttonStyle(.plain)
     .onHover { closeHovered = $0 }
     .help("Dismiss")
+    .accessibilityLabel("Dismiss")
   }
 
   private var headerCard: some View {
@@ -688,6 +689,7 @@ private struct DetectionPromptView: View {
       .overlay { FirstMouseClickArea(onClick: onRecord) }
       .onHover { recordHovered = $0 }
       .help("Start recording")
+      .accessibilityLabel("Start recording")
   }
 
   private var takeNotesButtonLabel: some View {
@@ -785,6 +787,7 @@ private struct RecordingExpandedCardView: View {
         }
         .buttonStyle(.plain)
         .help("Minimize")
+        .accessibilityLabel("Minimize")
       }
       .background(CardDragArea(pillPanel: pillPanel, onMoved: onMoved))
       transcript

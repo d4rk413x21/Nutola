@@ -210,6 +210,7 @@ struct MeetingsListView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Clear search")
+                .accessibilityLabel("Clear search")
             }
         }
         .padding(.horizontal, 12)

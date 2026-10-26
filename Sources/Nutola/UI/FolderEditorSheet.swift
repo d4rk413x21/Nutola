@@ -301,6 +301,8 @@ struct FolderEditorSheet: View {
                 }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Folder icon: \(symbol.replacingOccurrences(of: ".", with: " "))")
+        .accessibilityValue(selected ? "Selected" : "Not selected")
     }
 
     private var emojiPicker: some View {
@@ -353,6 +355,8 @@ struct FolderEditorSheet: View {
                 }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Folder emoji: \(emoji)")
+        .accessibilityValue(selected ? "Selected" : "Not selected")
     }
 
     private var footer: some View {

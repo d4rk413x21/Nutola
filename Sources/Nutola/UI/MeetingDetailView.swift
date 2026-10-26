@@ -209,6 +209,7 @@ struct MeetingDetailView: View {
             }
             .buttonStyle(.plain)
             .help("Copy transcript")
+            .accessibilityLabel("Copy transcript")
             .disabled(app.store.transcript(for: meeting.id).isEmpty)
             Button {
                 showShareNotes = true
@@ -219,6 +220,7 @@ struct MeetingDetailView: View {
             }
             .buttonStyle(.plain)
             .help("Share notes")
+            .accessibilityLabel("Share notes")
             publishMenu
         }
         .padding(.horizontal, 20)
@@ -314,6 +316,7 @@ struct MeetingDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Show all participants")
+                .accessibilityLabel("Show all participants")
                 .popover(isPresented: $showAttendees, arrowEdge: .top) {
                     attendeesPopover
                 }
@@ -556,12 +559,17 @@ struct MeetingDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 40)
             } else {
-                Text("Enhanced notes will appear here. Open My notes on the left, or use the Transcript panel below for the live transcript.")
+                Button {
+                    showSideNotes = true
+                } label: {
+                    Text("Enhanced notes will appear here. Open My notes on the left, or use the Transcript panel below for the live transcript.")
                     .font(.nutola(14))
                     .foregroundStyle(Theme.tertiary(scheme))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 40)
-                    .onTapGesture { showSideNotes = true }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open My notes")
             }
         }
     }
@@ -615,12 +623,14 @@ struct MeetingDetailView: View {
             HStack {
                 Spacer()
                 Button("Cancel") { notesDraft = nil }
+                    .keyboardShortcut(.cancelAction)
                 Button("Save") {
                     if let notesDraft, !app.store.saveSummarySafely(notesDraft, for: meeting.id) { return }
                     notesDraft = nil
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(actionColor)
+                .keyboardShortcut("s", modifiers: .command)
             }
             .controlSize(.small)
 

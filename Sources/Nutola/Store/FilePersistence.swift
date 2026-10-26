@@ -73,8 +73,10 @@ final class PersistenceStatus: ObservableObject {
     func refresh() { failures = FilePersistence.failures }
 
     func report(_ error: Error) {
-        operationError = error.localizedDescription
         refresh()
+        if !failures.values.contains(where: { $0.message == error.localizedDescription }) {
+            operationError = error.localizedDescription
+        }
     }
 }
 

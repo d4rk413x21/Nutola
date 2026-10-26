@@ -44,8 +44,9 @@ struct LinearIssueExport: Codable, Equatable, Sendable {
     var url: URL?
 }
 
+@MainActor
 struct LinearClient {
-    typealias Transport = (URLRequest) async throws -> (Data, HTTPURLResponse)
+    typealias Transport = @MainActor (URLRequest) async throws -> (Data, HTTPURLResponse)
     private let apiKey: String
     private let transport: Transport
     private static let session = URLSession(configuration: .ephemeral)

@@ -1,6 +1,7 @@
 import XCTest
 @testable import Nutola
 
+@MainActor
 final class LinearTests: XCTestCase {
     private let workspace = "workspace-id"
     private let team = "team-id"

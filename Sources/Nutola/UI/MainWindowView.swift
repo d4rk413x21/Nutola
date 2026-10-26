@@ -117,7 +117,7 @@ struct MainWindowView: View {
             } label: {
                 Label("New folder", systemImage: "plus")
                     .font(.nutola(13, .medium))
-                    .foregroundStyle(Theme.secondary(scheme))
+                    .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
         }

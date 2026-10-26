@@ -1,31 +1,32 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class JaroWinklerTests: XCTestCase {
-    func testIdenticalStrings() {
-        XCTAssertEqual(JaroWinkler.similarity("nutola", "nutola"), 1.0, accuracy: 0.0001)
+struct JaroWinklerTests {
+    @Test func testIdenticalStrings() {
+        #expect(abs((JaroWinkler.similarity("nutola", "nutola")) - (1.0)) <= 0.0001)
     }
 
-    func testEmptyStrings() {
-        XCTAssertEqual(JaroWinkler.similarity("", ""), 1.0, accuracy: 0.0001)
-        XCTAssertEqual(JaroWinkler.similarity("abc", ""), 0.0, accuracy: 0.0001)
+    @Test func testEmptyStrings() {
+        #expect(abs((JaroWinkler.similarity("", "")) - (1.0)) <= 0.0001)
+        #expect(abs((JaroWinkler.similarity("abc", "")) - (0.0)) <= 0.0001)
     }
 
-    func testCloseTypo() {
+    @Test func testCloseTypo() {
         // "nutola" vs "nutoa" — missing one letter. Should score high (>0.9).
         let score = JaroWinkler.similarity("nutola", "nutoa")
-        XCTAssertGreaterThan(score, 0.9)
+        #expect(score > 0.9)
     }
 
-    func testUnrelated() {
+    @Test func testUnrelated() {
         let score = JaroWinkler.similarity("nutola", "banana")
-        XCTAssertLessThan(score, 0.6)
+        #expect(score < 0.6)
     }
 
-    func testCommonPrefixBonus() {
+    @Test func testCommonPrefixBonus() {
         // Strings sharing a 4-char prefix score higher than same-jaro pairs
         // with a shorter prefix.
         let withPrefix = JaroWinkler.similarity("martha", "marhta")
-        XCTAssertGreaterThan(withPrefix, 0.95)
+        #expect(withPrefix > 0.95)
     }
 }

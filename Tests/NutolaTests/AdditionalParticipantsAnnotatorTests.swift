@@ -1,89 +1,90 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class AdditionalParticipantsAnnotatorTests: XCTestCase {
+struct AdditionalParticipantsAnnotatorTests {
     // Always-false local check so "You" / account-holder detection is disabled
     // in tests — we want to test the calendar diff purely.
     private let neverLocal: (String) -> Bool = { _ in false }
 
-    func testNoRosterReturnsNil() {
-        XCTAssertNil(AdditionalParticipantsAnnotator.annotation(
-            roster: [], attendees: ["Alice"], localParticipantCheck: neverLocal))
+    @Test func testNoRosterReturnsNil() {
+        #expect(AdditionalParticipantsAnnotator.annotation(
+            roster: [], attendees: ["Alice"], localParticipantCheck: neverLocal) == nil)
     }
 
-    func testAllRosterOnCalendarReturnsNil() {
+    @Test func testAllRosterOnCalendarReturnsNil() {
         let result = AdditionalParticipantsAnnotator.annotation(
             roster: ["Alice", "Bob"],
             attendees: ["Alice", "Bob"],
             localParticipantCheck: neverLocal)
-        XCTAssertNil(result)
+        #expect(result == nil)
     }
 
-    func testListsExtrasNotOnCalendar() {
+    @Test func testListsExtrasNotOnCalendar() {
         let result = AdditionalParticipantsAnnotator.annotation(
             roster: ["Alice", "Bob", "Lian Fernandes", "SiHun Sung"],
             attendees: ["Alice", "Bob"],
             localParticipantCheck: neverLocal)
-        XCTAssertNotNil(result)
-        XCTAssertTrue(result!.contains("Lian Fernandes"))
-        XCTAssertTrue(result!.contains("SiHun Sung"))
-        XCTAssertTrue(result!.contains("Additional participants"))
-        XCTAssertTrue(result!.contains("not on the calendar invite"))
+        #expect(result != nil)
+        #expect(result!.contains("Lian Fernandes"))
+        #expect(result!.contains("SiHun Sung"))
+        #expect(result!.contains("Additional participants"))
+        #expect(result!.contains("not on the calendar invite"))
     }
 
-    func testExcludesLocalParticipant() {
+    @Test func testExcludesLocalParticipant() {
         // Default local-participant check: "Taylor Morgan" is the Mac account holder.
         let result = AdditionalParticipantsAnnotator.annotation(
             roster: ["Taylor Morgan", "Alice"],
             attendees: [],
             localParticipantCheck: { $0 == "Taylor Morgan" })
-        XCTAssertNotNil(result)
-        XCTAssertTrue(result!.contains("Alice"))
-        XCTAssertFalse(result!.contains("Taylor Morgan"))
+        #expect(result != nil)
+        #expect(result!.contains("Alice"))
+        #expect(!(result!.contains("Taylor Morgan")))
     }
 
-    func testCaseInsensitiveMatching() {
+    @Test func testCaseInsensitiveMatching() {
         let result = AdditionalParticipantsAnnotator.annotation(
             roster: ["lian fernandes"],
             attendees: ["Lian Fernandes"],
             localParticipantCheck: neverLocal)
-        XCTAssertNil(result, "Name matching should be case-insensitive")
+        #expect(result == nil, "Name matching should be case-insensitive")
     }
 
-    func testWhitespaceNormalized() {
+    @Test func testWhitespaceNormalized() {
         let result = AdditionalParticipantsAnnotator.annotation(
             roster: ["Lian  Fernandes "],
             attendees: ["Lian Fernandes"],
             localParticipantCheck: neverLocal)
-        XCTAssertNil(result, "Internal/trailing whitespace should not split matches")
+        #expect(result == nil, "Internal/trailing whitespace should not split matches")
     }
 
-    func testDedupsRoster() {
+    @Test func testDedupsRoster() {
         let result = AdditionalParticipantsAnnotator.annotation(
             roster: ["Lian Fernandes", "lian fernandes", "Lian Fernandes"],
             attendees: [],
             localParticipantCheck: neverLocal)
-        XCTAssertNotNil(result)
+        #expect(result != nil)
         // The name appears only once in the output despite three roster entries.
         let occurrences = result!.components(separatedBy: "Lian Fernandes").count - 1
-        XCTAssertEqual(occurrences, 1)
+        #expect(occurrences == 1)
     }
 
-    func testEmptyAttendeesListsAllRemote() {
+    @Test func testEmptyAttendeesListsAllRemote() {
         let result = AdditionalParticipantsAnnotator.annotation(
             roster: ["Alice", "Bob"],
             attendees: [],
             localParticipantCheck: { _ in false })
-        XCTAssertNotNil(result)
-        XCTAssertTrue(result!.contains("Alice"))
-        XCTAssertTrue(result!.contains("Bob"))
+        #expect(result != nil)
+        #expect(result!.contains("Alice"))
+        #expect(result!.contains("Bob"))
     }
 
-    func testAnnotationFormatIsMarkdownHR() {
+    @Test func testAnnotationFormatIsMarkdownHR() {
         let result = AdditionalParticipantsAnnotator.annotation(
             roster: ["Alice"],
             attendees: [],
             localParticipantCheck: neverLocal)!
-        XCTAssertTrue(result.hasPrefix("---"), "Annotation should start with a markdown horizontal rule")
+        #expect(result.hasPrefix("---"), "Annotation should start with a markdown horizontal rule")
     }
 }

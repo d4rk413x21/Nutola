@@ -1,7 +1,8 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class TranscriptChapterizerTests: XCTestCase {
+struct TranscriptChapterizerTests {
     // MARK: - Helpers
 
     /// Build a turn with sensible defaults; `end` defaults to `start + 4`.
@@ -28,15 +29,15 @@ final class TranscriptChapterizerTests: XCTestCase {
 
     // MARK: - Tests
 
-    func testSingleChapter() {
+    @Test func testSingleChapter() {
         let chapters = TranscriptChapterizer.chapterize(turns: singleChapterTurns())
-        XCTAssertEqual(chapters.count, 1)
-        XCTAssertEqual(chapters[0].turnIndices, 0..<8)
-        XCTAssertEqual(chapters[0].startTime, 0)
-        XCTAssertEqual(chapters[0].endTime, 74) // last turn start 70 + 4
+        #expect(chapters.count == 1)
+        #expect(chapters[0].turnIndices == 0..<8)
+        #expect(chapters[0].startTime == 0)
+        #expect(chapters[0].endTime == 74) // last turn start 70 + 4
     }
 
-    func testPauseSplit() {
+    @Test func testPauseSplit() {
         // Two clusters separated by a >30s gap → two chapters.
         let turns = [
             turn(id: "a0", start: 0, text: "First cluster opening."),
@@ -46,12 +47,12 @@ final class TranscriptChapterizerTests: XCTestCase {
             turn(id: "b1", start: 50, text: "Second cluster continued."),
         ]
         let chapters = TranscriptChapterizer.chapterize(turns: turns, minChapterDuration: 1)
-        XCTAssertEqual(chapters.count, 2)
-        XCTAssertEqual(chapters[0].turnIndices, 0..<2)
-        XCTAssertEqual(chapters[1].turnIndices, 2..<4)
+        #expect(chapters.count == 2)
+        #expect(chapters[0].turnIndices == 0..<2)
+        #expect(chapters[1].turnIndices == 2..<4)
     }
 
-    func testTopicShiftSplit() {
+    @Test func testTopicShiftSplit() {
         // No pause between turns, but the third turn opens with "let's talk
         // about" → a new chapter starts at the third turn.
         let turns = [
@@ -62,16 +63,16 @@ final class TranscriptChapterizerTests: XCTestCase {
             turn(id: "b2", start: 32, text: "First milestone ships in August."),
         ]
         let chapters = TranscriptChapterizer.chapterize(turns: turns, minChapterDuration: 1)
-        XCTAssertGreaterThanOrEqual(chapters.count, 2)
+        #expect(chapters.count >= 2)
         // The chapter break must land at the topic-shift turn (index 2).
-        XCTAssertTrue(chapters.contains { $0.turnIndices.lowerBound == 2 })
+        #expect(chapters.contains { $0.turnIndices.lowerBound == 2 })
         // The chapter starting at index 2 should be titled from the keyword.
         if let shiftChapter = chapters.first(where: { $0.turnIndices.lowerBound == 2 }) {
-            XCTAssertFalse(shiftChapter.title.isEmpty)
+            #expect(!(shiftChapter.title.isEmpty))
         }
     }
 
-    func testMinChapterDuration() {
+    @Test func testMinChapterDuration() {
         // A very short middle chapter (<60s) gets merged into the previous one
         // so we end up with fewer chapters than the raw pause-based split.
         let turns = [
@@ -91,29 +92,29 @@ final class TranscriptChapterizerTests: XCTestCase {
         let merged = TranscriptChapterizer.chapterize(turns: turns, minChapterDuration: 60)
         let unmerged = TranscriptChapterizer.chapterize(turns: turns, minChapterDuration: 1)
 
-        XCTAssertGreaterThan(unmerged.count, merged.count)
+        #expect(unmerged.count > merged.count)
         // The short middle chapter must be absorbed, so we keep turn coverage.
         let mergedCount = merged.reduce(0) { $0 + $1.turnIndices.count }
-        XCTAssertEqual(mergedCount, turns.count)
+        #expect(mergedCount == turns.count)
         // No leftover chapter should be shorter than the minimum.
         for c in merged.dropFirst() {
-            XCTAssertGreaterThanOrEqual(c.endTime - c.startTime, 60)
+            #expect(c.endTime - c.startTime >= 60)
         }
     }
 
-    func testEmptyTurns() {
-        XCTAssertEqual(TranscriptChapterizer.chapterize(turns: []), [])
+    @Test func testEmptyTurns() {
+        #expect(TranscriptChapterizer.chapterize(turns: []) == [])
     }
 
-    func testChapterTitle() {
+    @Test func testChapterTitle() {
         let chapters = TranscriptChapterizer.chapterize(turns: singleChapterTurns())
-        XCTAssertEqual(chapters.count, 1)
-        XCTAssertFalse(chapters[0].title.isEmpty)
+        #expect(chapters.count == 1)
+        #expect(!(chapters[0].title.isEmpty))
         // Title should derive from the opening turn's first words.
-        XCTAssertTrue(chapters[0].title.lowercased().contains("turn"))
+        #expect(chapters[0].title.lowercased().contains("turn"))
     }
 
-    func testMultipleSpeakers() {
+    @Test func testMultipleSpeakers() {
         // 6 turns by "me" (a monologue of ≥5), then a speaker switch to "s1".
         // The speaker change after the monologue opens a new chapter.
         var turns: [TranscriptTurn] = []
@@ -128,12 +129,12 @@ final class TranscriptChapterizerTests: XCTestCase {
                              text: "Now I have a question about point \(i)."))
         }
         let chapters = TranscriptChapterizer.chapterize(turns: turns, minChapterDuration: 1)
-        XCTAssertGreaterThanOrEqual(chapters.count, 2)
+        #expect(chapters.count >= 2)
         // The new chapter must begin exactly where the speaker changes (index 6).
-        XCTAssertTrue(chapters.contains { $0.turnIndices.lowerBound == 6 })
+        #expect(chapters.contains { $0.turnIndices.lowerBound == 6 })
     }
 
-    func testChapterTimeRange() {
+    @Test func testChapterTimeRange() {
         // The chapter's start must equal the first turn's start and its end
         // must equal the last turn's end.
         let turns = [
@@ -142,21 +143,21 @@ final class TranscriptChapterizerTests: XCTestCase {
             turn(id: "x2", start: 30, end: 41, text: "Closing turn."),
         ]
         let chapters = TranscriptChapterizer.chapterize(turns: turns, minChapterDuration: 1)
-        XCTAssertEqual(chapters.count, 1)
-        XCTAssertEqual(chapters[0].startTime, 12)
-        XCTAssertEqual(chapters[0].endTime, 41)
-        XCTAssertEqual(chapters[0].turnIndices, 0..<3)
+        #expect(chapters.count == 1)
+        #expect(chapters[0].startTime == 12)
+        #expect(chapters[0].endTime == 41)
+        #expect(chapters[0].turnIndices == 0..<3)
     }
 
-    func testAlwaysAtLeastOneChapter() {
+    @Test func testAlwaysAtLeastOneChapter() {
         // A single turn yields exactly one chapter.
         let turns = [turn(id: "solo", start: 0, end: 2, text: "Hello world.")]
         let chapters = TranscriptChapterizer.chapterize(turns: turns)
-        XCTAssertEqual(chapters.count, 1)
-        XCTAssertEqual(chapters[0].turnIndices, 0..<1)
+        #expect(chapters.count == 1)
+        #expect(chapters[0].turnIndices == 0..<1)
     }
 
-    func testKeywordTitlePreferredOverLeadingWords() {
+    @Test func testKeywordTitlePreferredOverLeadingWords() {
         // When a topic-shift keyword is present, the chapter title should come
         // from the keyword rather than the leading words of the turn.
         let turns = [
@@ -165,15 +166,15 @@ final class TranscriptChapterizerTests: XCTestCase {
             turn(id: "b1", start: 20, text: "The budget forecast looks healthy."),
         ]
         let chapters = TranscriptChapterizer.chapterize(turns: turns, minChapterDuration: 1)
-        XCTAssertGreaterThanOrEqual(chapters.count, 2)
+        #expect(chapters.count >= 2)
         if let shiftChapter = chapters.first(where: { $0.turnIndices.lowerBound == 1 }) {
             // Title should derive from "let's talk about" rather than the
             // literal leading words "Now let's talk about the budget forecast."
-            XCTAssertTrue(shiftChapter.title.lowercased().contains("talk about"))
+            #expect(shiftChapter.title.lowercased().contains("talk about"))
         }
     }
 
-    func testChaptersCoverAllTurnsExactlyOnce() {
+    @Test func testChaptersCoverAllTurnsExactlyOnce() {
         // Across a mixed transcript, the union of chapter turn-ranges must
         // equal the full turn range with no gaps or overlaps.
         let turns: [TranscriptTurn] = [
@@ -184,13 +185,13 @@ final class TranscriptChapterizerTests: XCTestCase {
             turn(id: "c0", start: 240, text: "Final remarks and wrap up."),
         ]
         let chapters = TranscriptChapterizer.chapterize(turns: turns, minChapterDuration: 30)
-        XCTAssertFalse(chapters.isEmpty)
+        #expect(!(chapters.isEmpty))
         // Ranges are contiguous and cover every turn.
         var cursor = 0
         for c in chapters {
-            XCTAssertEqual(c.turnIndices.lowerBound, cursor)
+            #expect(c.turnIndices.lowerBound == cursor)
             cursor = c.turnIndices.upperBound
         }
-        XCTAssertEqual(cursor, turns.count)
+        #expect(cursor == turns.count)
     }
 }

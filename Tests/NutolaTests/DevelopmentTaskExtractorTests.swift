@@ -1,7 +1,8 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class DevelopmentTaskExtractorTests: XCTestCase {
+struct DevelopmentTaskExtractorTests {
     private var meeting: Meeting {
         var meeting = Meeting(title: "Planning", createdAt: Date(timeIntervalSince1970: 1_700_000_000))
         meeting.state = .ready
@@ -26,65 +27,65 @@ final class DevelopmentTaskExtractorTests: XCTestCase {
         return String(decoding: data, as: UTF8.self)
     }
 
-    func testDecodeNormalizesDraftsAndRetainsUnassignedOwner() throws {
+    @Test func testDecodeNormalizesDraftsAndRetainsUnassignedOwner() throws {
         let result = try DevelopmentTaskExtractor.decode(
             response(evidence: [2, 1, 2]), transcript: transcript, allowedEvidence: [1, 2], meeting: meeting)
-        XCTAssertEqual(result.count, 1)
-        XCTAssertNil(result[0].owner)
-        XCTAssertEqual(result[0].evidence, [1, 2])
+        #expect(result.count == 1)
+        #expect(result[0].owner == nil)
+        #expect(result[0].evidence == [1, 2])
     }
 
-    func testAcceptsKnownSpeakerAsExplicitOwner() throws {
+    @Test func testAcceptsKnownSpeakerAsExplicitOwner() throws {
         let result = try DevelopmentTaskExtractor.decode(
             response(owner: "Alice"), transcript: transcript, allowedEvidence: [1], meeting: meeting)
-        XCTAssertEqual(result[0].owner, "Alice")
+        #expect(result[0].owner == "Alice")
     }
 
-    func testAcceptsOwnerNamedInCitedPassageEvenWhenNotAnAttendee() throws {
+    @Test func testAcceptsOwnerNamedInCitedPassageEvenWhenNotAnAttendee() throws {
         var segments = transcript
         segments[0].text = "Please ask Marco to implement the refresh."
         let result = try DevelopmentTaskExtractor.decode(
             response(owner: "Marco"), transcript: segments, allowedEvidence: [1], meeting: meeting)
-        XCTAssertEqual(result[0].owner, "Marco")
+        #expect(result[0].owner == "Marco")
     }
 
-    func testRejectsUnsupportedOwner() throws {
-        XCTAssertThrowsError(try DevelopmentTaskExtractor.decode(
-            response(owner: "Invented person"), transcript: transcript, allowedEvidence: [1], meeting: meeting))
+    @Test func testRejectsUnsupportedOwner() throws {
+        #expect(throws: (any Error).self) { try DevelopmentTaskExtractor.decode(
+            response(owner: "Invented person"), transcript: transcript, allowedEvidence: [1], meeting: meeting) }
     }
 
-    func testRejectsMissingOutOfRangeAndNotYetReadEvidence() throws {
+    @Test func testRejectsMissingOutOfRangeAndNotYetReadEvidence() throws {
         for evidence in [[], [0], [-1], [3], [2]] as [[Int]] {
-            XCTAssertThrowsError(try DevelopmentTaskExtractor.decode(
-                response(evidence: evidence), transcript: transcript, allowedEvidence: [1], meeting: meeting))
+            #expect(throws: (any Error).self) { try DevelopmentTaskExtractor.decode(
+                response(evidence: evidence), transcript: transcript, allowedEvidence: [1], meeting: meeting) }
         }
     }
 
-    func testRejectsProseMalformedJSONAndEmptyFields() {
+    @Test func testRejectsProseMalformedJSONAndEmptyFields() {
         for text in [
             "Here is your task: fix login",
             "{\"tasks\": [",
             #"{"tasks":[{"title":" ","detail":"Fix login","evidence":[1]}]}"#,
             #"{"tasks":[{"title":"Fix login","detail":" ","evidence":[1]}]}"#,
         ] {
-            XCTAssertThrowsError(try DevelopmentTaskExtractor.decode(
-                text, transcript: transcript, allowedEvidence: [1], meeting: meeting))
+            #expect(throws: (any Error).self) { try DevelopmentTaskExtractor.decode(
+                text, transcript: transcript, allowedEvidence: [1], meeting: meeting) }
         }
     }
 
-    func testAcceptsJSONCodeFenceAndNoTasks() throws {
+    @Test func testAcceptsJSONCodeFenceAndNoTasks() throws {
         let result = try DevelopmentTaskExtractor.decode(
             "```json\n{\"tasks\":[]}\n```", transcript: transcript, allowedEvidence: [1], meeting: meeting)
-        XCTAssertTrue(result.isEmpty)
+        #expect(result.isEmpty)
     }
 
-    func testRejectsDuplicateTitlesIgnoringCaseAndWhitespace() {
+    @Test func testRejectsDuplicateTitlesIgnoringCaseAndWhitespace() {
         let text = #"{"tasks":[{"title":"Fix login","detail":"One","evidence":[1]},{"title":" FIX   LOGIN ","detail":"Two","evidence":[2]}]}"#
-        XCTAssertThrowsError(try DevelopmentTaskExtractor.decode(
-            text, transcript: transcript, allowedEvidence: [1, 2], meeting: meeting))
+        #expect(throws: (any Error).self) { try DevelopmentTaskExtractor.decode(
+            text, transcript: transcript, allowedEvidence: [1, 2], meeting: meeting) }
     }
 
-    func testChunkingIncludesEveryUtteranceEvenAnOversizedOne() {
+    @Test func testChunkingIncludesEveryUtteranceEvenAnOversizedOne() {
         var segments = transcript
         segments[0].text = String(repeating: "è", count: 30_000)
         segments += (0..<12).map { n in
@@ -92,35 +93,35 @@ final class DevelopmentTaskExtractorTests: XCTestCase {
                               text: String(repeating: "task \(n) ", count: 1_000))
         }
         let chunks = DevelopmentTaskExtractor.chunks(segments)
-        XCTAssertGreaterThan(chunks.count, 2)
-        XCTAssertEqual(chunks.flatMap { $0 }, Array(segments.indices))
-        XCTAssertEqual(chunks.first, [0])
+        #expect(chunks.count > 2)
+        #expect(chunks.flatMap { $0 } == Array(segments.indices))
+        #expect(chunks.first == [0])
     }
 
-    func testChunkingSkipsEmptyUtterancesWithoutRenumberingEvidence() {
+    @Test func testChunkingSkipsEmptyUtterancesWithoutRenumberingEvidence() {
         var segments = transcript
         segments[0].text = " \n "
-        XCTAssertEqual(DevelopmentTaskExtractor.chunks(segments), [[1]])
+        #expect(DevelopmentTaskExtractor.chunks(segments) == [[1]])
     }
 
     @MainActor
-    func testExtractionUsesOriginalPassagesAndCompleteTranscript() async throws {
+    @Test func testExtractionUsesOriginalPassagesAndCompleteTranscript() async throws {
         let segments = transcript
         let output = try response(evidence: [1, 2])
         let result = try await DevelopmentTaskExtractor.extract(
             meeting: meeting, transcript: segments, analyze: { prompt, input in
-                XCTAssertTrue(prompt.contains("untrusted data"))
-                for segment in segments { XCTAssertTrue(input.contains(segment.text)) }
-                XCTAssertTrue(input.contains("[1] Alice @ 0:12"))
+                #expect(prompt.contains("untrusted data"))
+                for segment in segments { #expect(input.contains(segment.text)) }
+                #expect(input.contains("[1] Alice @ 0:12"))
                 return output
             })
-        XCTAssertEqual(result.tasks[0].evidence, segments)
-        XCTAssertEqual(result.transcriptFingerprint, try DevelopmentTaskReview.fingerprint(segments))
-        XCTAssertNil(result.tasks[0].owner)
+        #expect(result.tasks[0].evidence == segments)
+        #expect(result.transcriptFingerprint == try DevelopmentTaskReview.fingerprint(segments))
+        #expect(result.tasks[0].owner == nil)
     }
 
     @MainActor
-    func testLaterPartsReceiveAndCanReviseEarlierDrafts() async throws {
+    @Test func testLaterPartsReceiveAndCanReviseEarlierDrafts() async throws {
         var segments = transcript
         segments[0].text = String(repeating: "We need token refresh. ", count: 1_500)
         segments[1].text = "Actually, cancel the refresh work: it is already implemented."
@@ -131,69 +132,69 @@ final class DevelopmentTaskExtractorTests: XCTestCase {
             meeting: meeting, transcript: segments, analyze: { _, input in
                 calls += 1
                 if calls == 1 { return first }
-                XCTAssertTrue(input.contains("Fix token refresh"))
-                XCTAssertTrue(input.contains(segments[1].text))
+                #expect(input.contains("Fix token refresh"))
+                #expect(input.contains(segments[1].text))
                 return #"{"tasks":[]}"#
             }, onProgress: { part, total in
                 progress.append(part)
-                XCTAssertEqual(total, 2)
+                #expect(total == 2)
             })
-        XCTAssertEqual(calls, 2)
-        XCTAssertEqual(progress, [1, 2])
-        XCTAssertTrue(result.tasks.isEmpty)
+        #expect(calls == 2)
+        #expect(progress == [1, 2])
+        #expect(result.tasks.isEmpty)
     }
 
     @MainActor
-    func testNoTranscriptDoesNotCallTheCLI() async {
+    @Test func testNoTranscriptDoesNotCallTheCLI() async {
         do {
             _ = try await DevelopmentTaskExtractor.extract(
                 meeting: meeting, transcript: [], analyze: { _, _ in
-                    XCTFail("No CLI should be invoked")
+                    Issue.record("No CLI should be invoked")
                     return ""
                 })
-            XCTFail("Expected noTranscript")
+            Issue.record("Expected noTranscript")
         } catch DevelopmentTaskError.noTranscript {
-        } catch { XCTFail("Unexpected error: \(error)") }
+        } catch { Issue.record("Unexpected error: \(error)") }
     }
 
     @MainActor
-    func testCancellationPreventsAnalysis() async {
+    @Test func testCancellationPreventsAnalysis() async {
         let meeting = self.meeting
         let transcript = self.transcript
         let task = Task {
             try await DevelopmentTaskExtractor.extract(
                 meeting: meeting, transcript: transcript, analyze: { _, _ in
-                    XCTFail("Cancelled extraction must not launch the CLI")
+                    Issue.record("Cancelled extraction must not launch the CLI")
                     return ""
                 })
         }
         task.cancel()
         do {
             _ = try await task.value
-            XCTFail("Expected cancellation")
+            Issue.record("Expected cancellation")
         } catch is CancellationError {
-        } catch { XCTFail("Unexpected error: \(error)") }
+        } catch { Issue.record("Unexpected error: \(error)") }
     }
 
-    func testFingerprintIsStableAfterReloadAndDetectsEditsWithTheSameIDs() throws {
+    @Test func testFingerprintIsStableAfterReloadAndDetectsEditsWithTheSameIDs() throws {
         let original = transcript
         var edited = try JSONDecoder().decode([TranscriptSegment].self, from: JSONEncoder().encode(original))
-        XCTAssertEqual(try DevelopmentTaskReview.fingerprint(original), try DevelopmentTaskReview.fingerprint(edited))
+        #expect(try DevelopmentTaskReview.fingerprint(original) == try DevelopmentTaskReview.fingerprint(edited))
         edited[0].text = "Cancel the refresh work."
-        XCTAssertNotEqual(try DevelopmentTaskReview.fingerprint(original), try DevelopmentTaskReview.fingerprint(edited))
+        #expect(try DevelopmentTaskReview.fingerprint(original) != try DevelopmentTaskReview.fingerprint(edited))
     }
 
-    func testMarkdownIncludesOnlySelectedDraftsAndOriginalEvidence() {
+    @Test func testMarkdownIncludesOnlySelectedDraftsAndOriginalEvidence() {
         let meeting = self.meeting
         let included = DevelopmentTaskDraft(title: "Fix login", detail: "Handle token expiry.", evidence: transcript)
         let excluded = DevelopmentTaskDraft(title: "Excluded task", detail: "Not selected", evidence: [])
         let review = DevelopmentTaskReview(tasks: [included, excluded])
         let markdown = review.markdown(meeting: meeting, selectedIDs: [included.id])
-        XCTAssertTrue(markdown.contains("Fix login"))
-        XCTAssertTrue(markdown.contains("Owner: Unassigned"))
-        XCTAssertTrue(markdown.contains(meeting.id.uuidString))
-        XCTAssertTrue(markdown.contains("Alice @ 0:12"))
-        XCTAssertTrue(markdown.contains(transcript[0].text))
-        XCTAssertFalse(markdown.contains("Excluded task"))
+        #expect(markdown.contains("Fix login"))
+        #expect(markdown.contains("Owner: Unassigned"))
+        #expect(markdown.contains(meeting.id.uuidString))
+        #expect(markdown.contains("Alice @ 0:12"))
+        #expect(markdown.contains(transcript[0].text))
+        #expect(!(markdown.contains("Excluded task")))
     }
 }

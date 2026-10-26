@@ -1,17 +1,18 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class AskContextBuilderTests: XCTestCase {
+final class AskContextBuilderTests {
     var tmp: URL!
     var archive: MeetingArchive!
 
-    override func setUp() {
+    init() {
         tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-ask-tests-\(UUID().uuidString)")
         archive = MeetingArchive(root: tmp)
     }
 
-    override func tearDown() {
+    deinit {
         try? FileManager.default.removeItem(at: tmp)
     }
 
@@ -23,7 +24,7 @@ final class AskContextBuilderTests: XCTestCase {
         return m
     }
 
-    func testEnrichLibraryPromptIncludesMeetingData() throws {
+    @Test func testEnrichLibraryPromptIncludesMeetingData() throws {
         let meeting = makeMeeting()
         try archive.save(meeting)
         try archive.saveSummary("# Roadmap sync\n\nDecided to ship folders.", for: meeting.id)
@@ -31,19 +32,19 @@ final class AskContextBuilderTests: XCTestCase {
         let prompt = ClaudeDesktopPrompt.library(question: "Summarize my meetings this week")
         let enriched = AskContextBuilder.enrichForCLI(prompt, archive: archive)
 
-        XCTAssertTrue(enriched.contains("Meeting data from Nutola"))
-        XCTAssertTrue(enriched.contains("Roadmap sync"))
-        XCTAssertTrue(enriched.contains("Decided to ship folders"))
-        XCTAssertNotEqual(enriched, prompt)
+        #expect(enriched.contains("Meeting data from Nutola"))
+        #expect(enriched.contains("Roadmap sync"))
+        #expect(enriched.contains("Decided to ship folders"))
+        #expect(enriched != prompt)
     }
 
-    func testEnrichReturnsPromptWhenNoMeetings() {
+    @Test func testEnrichReturnsPromptWhenNoMeetings() {
         let prompt = ClaudeDesktopPrompt.library(question: "Summarize my meetings this week")
         let enriched = AskContextBuilder.enrichForCLI(prompt, archive: archive)
-        XCTAssertEqual(enriched, prompt)
+        #expect(enriched == prompt)
     }
 
-    func testOnDeviceIncludesSummariesNotJustList() throws {
+    @Test func testOnDeviceIncludesSummariesNotJustList() throws {
         let withNotes = makeMeeting(title: "All Hands")
         try archive.save(withNotes)
         try archive.saveSummary("## TL;DR\nShipped folders feature.", for: withNotes.id)
@@ -54,12 +55,12 @@ final class AskContextBuilderTests: XCTestCase {
         let prompt = ClaudeDesktopPrompt.library(question: "Summarize my meetings this week")
         let enriched = AskContextBuilder.enrichForAsk(prompt, archive: archive, limits: .onDevice)
 
-        XCTAssertTrue(enriched.contains("Shipped folders"))
-        XCTAssertTrue(enriched.contains("All Hands"))
-        XCTAssertFalse(enriched.contains("## Recent meetings"))
+        #expect(enriched.contains("Shipped folders"))
+        #expect(enriched.contains("All Hands"))
+        #expect(!(enriched.contains("## Recent meetings")))
     }
 
-    func testOnDeviceLimitsStayWithinBudget() throws {
+    @Test func testOnDeviceLimitsStayWithinBudget() throws {
         for i in 0..<12 {
             let meeting = makeMeeting(title: "Meeting \(i)")
             try archive.save(meeting)
@@ -71,7 +72,7 @@ final class AskContextBuilderTests: XCTestCase {
         let prompt = ClaudeDesktopPrompt.library(question: "Summarize my meetings this week")
         let enriched = AskContextBuilder.enrichForAsk(prompt, archive: archive, limits: .onDevice)
 
-        XCTAssertTrue(enriched.contains("Meeting data from Nutola"))
-        XCTAssertLessThanOrEqual(enriched.count, AskContextBuilder.Limits.onDevice.maxTotalChars! + 32)
+        #expect(enriched.contains("Meeting data from Nutola"))
+        #expect(enriched.count <= AskContextBuilder.Limits.onDevice.maxTotalChars! + 32)
     }
 }

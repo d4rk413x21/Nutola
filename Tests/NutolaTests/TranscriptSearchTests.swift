@@ -1,7 +1,8 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class TranscriptSearchTests: XCTestCase {
+struct TranscriptSearchTests {
     private func makeTurns() -> [TranscriptTurn] {
         let segments = [
             TranscriptSegment(speakerID: "me", start: 0, end: 1, text: "Hello world"),
@@ -11,37 +12,37 @@ final class TranscriptSearchTests: XCTestCase {
         return TranscriptTurnBuilder.turns(from: segments)
     }
 
-    func testEmptySearchReturnsAll() {
+    @Test func testEmptySearchReturnsAll() {
         let turns = makeTurns()
         let filtered = TranscriptTurnBuilder.filter(turns: turns, by: "")
-        XCTAssertEqual(filtered.count, turns.count)
+        #expect(filtered.count == turns.count)
     }
 
-    func testCaseInsensitiveMatch() {
+    @Test func testCaseInsensitiveMatch() {
         let turns = makeTurns()
         let filtered = TranscriptTurnBuilder.filter(turns: turns, by: "HELLO")
-        XCTAssertEqual(filtered.count, 1)
-        XCTAssertEqual(filtered.first?.text, "Hello world")
+        #expect(filtered.count == 1)
+        #expect(filtered.first?.text == "Hello world")
     }
 
-    func testPartialMatch() {
+    @Test func testPartialMatch() {
         let turns = makeTurns()
         let filtered = TranscriptTurnBuilder.filter(turns: turns, by: "good")
-        XCTAssertEqual(filtered.count, 1)
-        XCTAssertEqual(filtered.first?.text, "Goodbye")
+        #expect(filtered.count == 1)
+        #expect(filtered.first?.text == "Goodbye")
     }
 
-    func testNoResults() {
+    @Test func testNoResults() {
         let turns = makeTurns()
         let filtered = TranscriptTurnBuilder.filter(turns: turns, by: "nonexistent")
-        XCTAssertTrue(filtered.isEmpty)
+        #expect(filtered.isEmpty)
     }
 
-    func testEmptyTurnsEmptySearch() {
-        XCTAssertTrue(TranscriptTurnBuilder.filter(turns: [], by: "").isEmpty)
+    @Test func testEmptyTurnsEmptySearch() {
+        #expect(TranscriptTurnBuilder.filter(turns: [], by: "").isEmpty)
     }
 
-    func testEmptyTurnsNonEmptySearch() {
-        XCTAssertTrue(TranscriptTurnBuilder.filter(turns: [], by: "x").isEmpty)
+    @Test func testEmptyTurnsNonEmptySearch() {
+        #expect(TranscriptTurnBuilder.filter(turns: [], by: "x").isEmpty)
     }
 }

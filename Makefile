@@ -28,7 +28,7 @@ build:
 	swift build -c release
 
 test:
-	swift test
+	swift test --disable-xctest
 
 app: build
 	rm -rf "$(APP)"

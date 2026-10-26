@@ -1,9 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
 @MainActor
-final class MeetingSearchTests: XCTestCase {
-    func testSearchFindsTranscriptMatch() throws {
+struct MeetingSearchTests {
+    @Test func testSearchFindsTranscriptMatch() throws {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("search-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
@@ -20,16 +21,16 @@ final class MeetingSearchTests: XCTestCase {
         ], for: meeting.id)
 
         // Verify data was saved
-        XCTAssertEqual(store.meetings.count, 1, "meeting should be in store")
-        XCTAssertEqual(store.transcript(for: meeting.id).count, 2, "transcript should be saved")
+        #expect(store.meetings.count == 1, "meeting should be in store")
+        #expect(store.transcript(for: meeting.id).count == 2, "transcript should be saved")
 
         let results = store.searchAll("API")
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results[0].matchingSegments.count, 1)
-        XCTAssertFalse(results[0].summaryMatch)
+        #expect(results.count == 1)
+        #expect(results[0].matchingSegments.count == 1)
+        #expect(!(results[0].summaryMatch))
     }
 
-    func testSearchFindsSummaryMatch() throws {
+    @Test func testSearchFindsSummaryMatch() throws {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("search-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
@@ -43,19 +44,19 @@ final class MeetingSearchTests: XCTestCase {
         store.saveSummary("We discussed the new button design and color palette.", for: meeting.id)
 
         let results = store.searchAll("button")
-        XCTAssertEqual(results.count, 1)
-        XCTAssertTrue(results[0].summaryMatch)
-        XCTAssertTrue(results[0].matchingSegments.isEmpty)
+        #expect(results.count == 1)
+        #expect(results[0].summaryMatch)
+        #expect(results[0].matchingSegments.isEmpty)
     }
 
-    func testSearchEmptyQueryReturnsNothing() throws {
+    @Test func testSearchEmptyQueryReturnsNothing() throws {
         let archive = MeetingArchive(root: FileManager.default.temporaryDirectory)
         let store = MeetingStore(archive: archive)
         let results = store.searchAll("")
-        XCTAssertTrue(results.isEmpty)
+        #expect(results.isEmpty)
     }
 
-    func testSearchCaseInsensitive() throws {
+    @Test func testSearchCaseInsensitive() throws {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("search-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
@@ -70,15 +71,15 @@ final class MeetingSearchTests: XCTestCase {
             TranscriptSegment(speakerID: "me", start: 0, end: 1, text: "Deploy to Production")
         ], for: meeting.id)
 
-        XCTAssertEqual(store.meetings.count, 1, "meeting should be in store")
-        XCTAssertEqual(store.transcript(for: meeting.id).count, 1, "transcript should be saved")
+        #expect(store.meetings.count == 1, "meeting should be in store")
+        #expect(store.transcript(for: meeting.id).count == 1, "transcript should be saved")
 
         let results = store.searchAll("production")
-        XCTAssertEqual(results.count, 1, "should find 'production' in 'Deploy to Production'")
-        XCTAssertEqual(results.first?.matchingSegments.count, 1)
+        #expect(results.count == 1, "should find 'production' in 'Deploy to Production'")
+        #expect(results.first?.matchingSegments.count == 1)
     }
 
-    func testSearchMultipleMeetings() throws {
+    @Test func testSearchMultipleMeetings() throws {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("search-test-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
@@ -102,8 +103,8 @@ final class MeetingSearchTests: XCTestCase {
         ], for: meeting2.id)
 
         let results = store.searchAll("API")
-        XCTAssertEqual(results.count, 2)
-        XCTAssertEqual(results[0].matchingSegments.count, 2)
-        XCTAssertEqual(results[1].matchingSegments.count, 1)
+        #expect(results.count == 2)
+        #expect(results[0].matchingSegments.count == 2)
+        #expect(results[1].matchingSegments.count == 1)
     }
 }

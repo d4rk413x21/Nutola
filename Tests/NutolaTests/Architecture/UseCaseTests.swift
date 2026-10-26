@@ -1,11 +1,12 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
 @MainActor
-final class UseCaseTests: XCTestCase {
+struct UseCaseTests {
     // MARK: - Prepare
 
-    func testPrepareMeetingCreatesPrepStateMeeting() {
+    @Test func testPrepareMeetingCreatesPrepStateMeeting() {
         let meetings = MockMeetingRepository()
         let folders = MeetingFolderStore()
         let settings = MockSettingsRepository()
@@ -18,15 +19,16 @@ final class UseCaseTests: XCTestCase {
 
         let result = useCase.execute(calendarEvent: ArchitectureFixtures.sampleCalendarEvent())
         guard case .success(let meeting) = result else {
-            return XCTFail("Expected success")
+            Issue.record("Expected success")
+            return
         }
-        XCTAssertEqual(meeting.state, .prep)
-        XCTAssertEqual(meeting.title, "Weekly Standup")
-        XCTAssertEqual(meeting.calendarEventID, "evt-1")
-        XCTAssertEqual(meetings.meetings.count, 1)
+        #expect(meeting.state == .prep)
+        #expect(meeting.title == "Weekly Standup")
+        #expect(meeting.calendarEventID == "evt-1")
+        #expect(meetings.meetings.count == 1)
     }
 
-    func testPrepareMeetingUsesDefaultTemplate() {
+    @Test func testPrepareMeetingUsesDefaultTemplate() {
         let meetings = MockMeetingRepository()
         var settings = MockSettingsRepository()
         settings.defaultTemplate = "1-on-1"
@@ -39,12 +41,13 @@ final class UseCaseTests: XCTestCase {
 
         guard case .success(let meeting) = useCase.execute(
             calendarEvent: ArchitectureFixtures.sampleCalendarEvent()) else {
-            return XCTFail("Expected success")
+            Issue.record("Expected success")
+            return
         }
-        XCTAssertEqual(meeting.templateName, "1-on-1")
+        #expect(meeting.templateName == "1-on-1")
     }
 
-    func testPrepareMeetingUsesPerEventOverrideWhenAvailable() {
+    @Test func testPrepareMeetingUsesPerEventOverrideWhenAvailable() {
         let meetings = MockMeetingRepository()
         let settings = MockSettingsRepository()
         let overrides = TemplateOverrideStore()
@@ -58,13 +61,14 @@ final class UseCaseTests: XCTestCase {
             availableTemplateNames: { ["Meeting Notes", "Interview", "1-on-1"] })
 
         guard case .success(let meeting) = useCase.execute(calendarEvent: event) else {
-            return XCTFail("Expected success")
+            Issue.record("Expected success")
+            return
         }
         // Per-event assignment wins over the default template.
-        XCTAssertEqual(meeting.templateName, "Interview")
+        #expect(meeting.templateName == "Interview")
     }
 
-    func testPrepareMeetingIgnoresOverrideWhenTemplateDeleted() {
+    @Test func testPrepareMeetingIgnoresOverrideWhenTemplateDeleted() {
         let meetings = MockMeetingRepository()
         var settings = MockSettingsRepository()
         settings.defaultTemplate = "Meeting Notes"
@@ -79,16 +83,17 @@ final class UseCaseTests: XCTestCase {
             availableTemplateNames: { ["Meeting Notes"] }) // "Gone" no longer exists
 
         guard case .success(let meeting) = useCase.execute(calendarEvent: event) else {
-            return XCTFail("Expected success")
+            Issue.record("Expected success")
+            return
         }
         // Stale override is pruned on read; default applies.
-        XCTAssertEqual(meeting.templateName, "Meeting Notes")
-        XCTAssertNil(overrides.overrides[event.id], "stale override should have been pruned")
+        #expect(meeting.templateName == "Meeting Notes")
+        #expect(overrides.overrides[event.id] == nil, "stale override should have been pruned")
     }
 
     // MARK: - Open calendar event
 
-    func testOpenCalendarEventReturnsExistingMeeting() async {
+    @Test func testOpenCalendarEventReturnsExistingMeeting() async {
         let meetings = MockMeetingRepository()
         let event = ArchitectureFixtures.sampleCalendarEvent()
         var existing = Meeting(title: "Prior", createdAt: Date())
@@ -110,10 +115,10 @@ final class UseCaseTests: XCTestCase {
             prepareMeeting: prepare)
 
         let outcome = await useCase.execute(event)
-        XCTAssertEqual(outcome, .openExisting(existing.id))
+        #expect(outcome == .openExisting(existing.id))
     }
 
-    func testOpenCalendarEventPreparesWhenMissing() async {
+    @Test func testOpenCalendarEventPreparesWhenMissing() async {
         let meetings = MockMeetingRepository()
         let calendar = MockCalendarRepository()
         let prepare = PrepareMeetingUseCase(
@@ -129,14 +134,15 @@ final class UseCaseTests: XCTestCase {
 
         let outcome = await useCase.execute(ArchitectureFixtures.sampleCalendarEvent())
         guard case .prepared(let id) = outcome else {
-            return XCTFail("Expected prepared")
+            Issue.record("Expected prepared")
+            return
         }
-        XCTAssertEqual(meetings.meeting(id: id)?.state, .prep)
+        #expect(meetings.meeting(id: id)?.state == .prep)
     }
 
     // MARK: - Process
 
-    func testProcessMeetingUpdatesStateAndNotifies() async {
+    @Test func testProcessMeetingUpdatesStateAndNotifies() async {
         let meetings = MockMeetingRepository()
         var meeting = Meeting(title: "Test", createdAt: Date())
         meeting.state = .processing
@@ -158,12 +164,12 @@ final class UseCaseTests: XCTestCase {
 
         await useCase.execute(meeting)
 
-        XCTAssertEqual(meetings.meeting(id: meeting.id)?.state, .ready)
-        XCTAssertEqual(notifications.readyMeetings.count, 1)
-        XCTAssertFalse(progressStages.isEmpty)
+        #expect(meetings.meeting(id: meeting.id)?.state == .ready)
+        #expect(notifications.readyMeetings.count == 1)
+        #expect(!(progressStages.isEmpty))
     }
 
-    func testProcessMeetingMergesLiveTranscriptBeforePipeline() async {
+    @Test func testProcessMeetingMergesLiveTranscriptBeforePipeline() async {
         let meetings = MockMeetingRepository()
         var meeting = Meeting(title: "Live", createdAt: Date())
         meeting.state = .processing
@@ -184,12 +190,12 @@ final class UseCaseTests: XCTestCase {
         await useCase.execute(meeting)
 
         let saved = meetings.transcript(for: meeting.id)
-        XCTAssertEqual(saved.count, 2)
-        XCTAssertEqual(saved.map(\.text), ["Hello", "Hi"])
-        XCTAssertTrue(meetings.archive.liveTranscript(for: meeting.id).isEmpty)
+        #expect(saved.count == 2)
+        #expect(saved.map(\.text) == ["Hello", "Hi"])
+        #expect(meetings.archive.liveTranscript(for: meeting.id).isEmpty)
     }
 
-    func testProcessMeetingPreservesUserSpeakerRenames() async {
+    @Test func testProcessMeetingPreservesUserSpeakerRenames() async {
         let meetings = MockMeetingRepository()
         var meeting = Meeting(title: "Rename", createdAt: Date())
         meeting.state = .processing
@@ -209,10 +215,10 @@ final class UseCaseTests: XCTestCase {
 
         await useCase.execute(meeting)
 
-        XCTAssertEqual(meetings.meeting(id: meeting.id)?.speakers.first?.name, "Alice")
+        #expect(meetings.meeting(id: meeting.id)?.speakers.first?.name == "Alice")
     }
 
-    func testProcessMeetingDoesNotNotifyWhenFailed() async {
+    @Test func testProcessMeetingDoesNotNotifyWhenFailed() async {
         let meetings = MockMeetingRepository()
         let meeting = Meeting(title: "Fail", createdAt: Date())
         try? meetings.archive.createFolder(for: meeting.id)
@@ -229,13 +235,13 @@ final class UseCaseTests: XCTestCase {
 
         await useCase.execute(meeting)
 
-        XCTAssertEqual(meetings.meeting(id: meeting.id)?.state, .failed)
-        XCTAssertTrue(notifications.readyMeetings.isEmpty)
+        #expect(meetings.meeting(id: meeting.id)?.state == .failed)
+        #expect(notifications.readyMeetings.isEmpty)
     }
 
     // MARK: - Regenerate
 
-    func testRegenerateSummarySavesMarkdownAndTitle() async {
+    @Test func testRegenerateSummarySavesMarkdownAndTitle() async {
         let meetings = MockMeetingRepository()
         var meeting = Meeting(title: "Untitled", createdAt: Date())
         meeting.state = .ready
@@ -255,13 +261,13 @@ final class UseCaseTests: XCTestCase {
 
         await useCase.execute(meetingID: meeting.id)
 
-        XCTAssertEqual(meetings.summary(for: meeting.id), "# Notes\n\nTest summary")
-        XCTAssertEqual(meetings.meeting(id: meeting.id)?.title, "Test Meeting Title")
-        XCTAssertEqual(meetings.meeting(id: meeting.id)?.summaryProvider, "apple")
-        XCTAssertTrue(streamed.contains("partial"))
+        #expect(meetings.summary(for: meeting.id) == "# Notes\n\nTest summary")
+        #expect(meetings.meeting(id: meeting.id)?.title == "Test Meeting Title")
+        #expect(meetings.meeting(id: meeting.id)?.summaryProvider == "apple")
+        #expect(streamed.contains("partial"))
     }
 
-    func testRegenerateSummaryKeepsCalendarTitle() async {
+    @Test func testRegenerateSummaryKeepsCalendarTitle() async {
         let meetings = MockMeetingRepository()
         var meeting = Meeting(title: "Standup", createdAt: Date())
         meeting.calendarEventTitle = "Standup"
@@ -277,12 +283,12 @@ final class UseCaseTests: XCTestCase {
 
         await useCase.execute(meetingID: meeting.id)
 
-        XCTAssertEqual(meetings.meeting(id: meeting.id)?.title, "Standup")
+        #expect(meetings.meeting(id: meeting.id)?.title == "Standup")
     }
 
     // MARK: - Retry
 
-    func testRetryFailedMeetingRunsProcess() async {
+    @Test func testRetryFailedMeetingRunsProcess() async {
         let meetings = MockMeetingRepository()
         var meeting = Meeting(title: "Failed", createdAt: Date())
         meeting.state = .failed
@@ -304,12 +310,12 @@ final class UseCaseTests: XCTestCase {
 
         await retry.execute(meetingID: meeting.id)
 
-        XCTAssertEqual(processing.processCallCount, 1)
-        XCTAssertEqual(processing.summarizeCallCount, 0)
-        XCTAssertEqual(meetings.meeting(id: meeting.id)?.state, .ready)
+        #expect(processing.processCallCount == 1)
+        #expect(processing.summarizeCallCount == 0)
+        #expect(meetings.meeting(id: meeting.id)?.state == .ready)
     }
 
-    func testRetryReadyMeetingRegeneratesSummary() async {
+    @Test func testRetryReadyMeetingRegeneratesSummary() async {
         let meetings = MockMeetingRepository()
         var meeting = Meeting(title: "Ready", createdAt: Date())
         meeting.state = .ready
@@ -334,7 +340,7 @@ final class UseCaseTests: XCTestCase {
 
         await retry.execute(meetingID: meeting.id)
 
-        XCTAssertEqual(processing.processCallCount, 0)
-        XCTAssertEqual(processing.summarizeCallCount, 1)
+        #expect(processing.processCallCount == 0)
+        #expect(processing.summarizeCallCount == 1)
     }
 }

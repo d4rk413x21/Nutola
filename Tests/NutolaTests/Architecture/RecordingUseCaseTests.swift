@@ -1,9 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
 @MainActor
-final class RecordingUseCaseTests: XCTestCase {
-    func testStopRecordingPersistsDurationAndProcesses() async {
+struct RecordingUseCaseTests {
+    @Test func testStopRecordingPersistsDurationAndProcesses() async {
         let meetings = MockMeetingRepository()
         let recording = MockRecordingService()
         let handle = ArchitectureFixtures.recordingHandle(repository: meetings)
@@ -21,33 +22,13 @@ final class RecordingUseCaseTests: XCTestCase {
 
         let result = await stop.execute()
 
-        XCTAssertEqual(recording.stopCallCount, 1)
-        XCTAssertNotNil(result)
-        XCTAssertEqual(processing.processCallCount, 1)
-        XCTAssertEqual(meetings.meeting(id: handle.meeting.id)?.duration, 0)
+        #expect(recording.stopCallCount == 1)
+        #expect(result != nil)
+        #expect(processing.processCallCount == 1)
+        #expect(meetings.meeting(id: handle.meeting.id)?.duration == 0)
     }
 
-    func testStopAwaitsCaptureFinalizationBeforeProcessing() async {
-        let meetings = MockMeetingRepository()
-        let recording = MockRecordingService()
-        let handle = ArchitectureFixtures.recordingHandle(repository: meetings)
-        recording.stopPair = (handle.session, handle.meeting)
-        let processing = MockProcessingService()
-        let processUC = ProcessMeetingUseCase(
-            meetingRepository: meetings,
-            processingService: processing,
-            notificationService: MockNotificationService())
-        let stop = StopRecordingUseCase(
-            recordingService: recording,
-            meetingRepository: meetings,
-            processMeeting: processUC)
-
-        _ = await stop.execute()
-        XCTAssertEqual(recording.stopCallCount, 1)
-        XCTAssertEqual(processing.processCallCount, 1)
-    }
-
-    func testStopRecordingReturnsNilWhenNothingActive() async {
+    @Test func testStopRecordingReturnsNilWhenNothingActive() async {
         let meetings = MockMeetingRepository()
         let recording = MockRecordingService()
         let processUC = ProcessMeetingUseCase(
@@ -60,11 +41,11 @@ final class RecordingUseCaseTests: XCTestCase {
             processMeeting: processUC)
 
         let result = await stop.execute()
-        XCTAssertNil(result)
-        XCTAssertEqual(recording.stopCallCount, 1)
+        #expect(result == nil)
+        #expect(recording.stopCallCount == 1)
     }
 
-    func testDiscardRecordingDeletesMeeting() {
+    @Test func testDiscardRecordingDeletesMeeting() {
         let meetings = MockMeetingRepository()
         let recording = MockRecordingService()
         let handle = ArchitectureFixtures.recordingHandle(repository: meetings)
@@ -76,11 +57,11 @@ final class RecordingUseCaseTests: XCTestCase {
 
         discard.execute()
 
-        XCTAssertEqual(recording.discardCallCount, 1)
-        XCTAssertNil(meetings.meeting(id: handle.meeting.id))
+        #expect(recording.discardCallCount == 1)
+        #expect(meetings.meeting(id: handle.meeting.id) == nil)
     }
 
-    func testStartRecordingUseCaseForwardsToService() async {
+    @Test func testStartRecordingUseCaseForwardsToService() async {
         let meetings = MockMeetingRepository()
         let recording = MockRecordingService()
         let handle = ArchitectureFixtures.recordingHandle(repository: meetings)
@@ -98,13 +79,14 @@ final class RecordingUseCaseTests: XCTestCase {
         let result = await start.execute(sourceApp: "Zoom", calendarEvent: nil)
 
         guard case .success(let got) = result else {
-            return XCTFail("Expected success")
+            Issue.record("Expected success")
+            return
         }
-        XCTAssertEqual(got.meeting.id, handle.meeting.id)
-        XCTAssertEqual(recording.startCallCount, 1)
+        #expect(got.meeting.id == handle.meeting.id)
+        #expect(recording.startCallCount == 1)
     }
 
-    func testContinueRecordingReturnsFailureWhenNotAllowed() async {
+    @Test func testContinueRecordingReturnsFailureWhenNotAllowed() async {
         let meetings = MockMeetingRepository()
         let recording = MockRecordingService()
         recording.continueResult = .failure(.cannotContinue)
@@ -115,8 +97,9 @@ final class RecordingUseCaseTests: XCTestCase {
 
         let result = await useCase.execute(meetingID: UUID())
         guard case .failure(let error) = result else {
-            return XCTFail("Expected failure")
+            Issue.record("Expected failure")
+            return
         }
-        XCTAssertEqual(error, .cannotContinue)
+        #expect(error == .cannotContinue)
     }
 }

@@ -108,8 +108,14 @@ Swift 6 language mode.
 git clone https://github.com/d4rk413x21/Nutola.git
 cd Nutola
 make install  # build, package and install /Applications/Nutola.app
-swift test    # run the test suite
+make test     # run the Swift Testing suite
 ```
+
+Tests use Swift Testing (`@Test`, `#expect`, and `#require`), included in the
+Swift toolchain. Suites with isolated fixtures can run in parallel. Tests that
+change process-wide preferences or retry pending writes live under the serialized
+`SharedStateTests` suite. Tests requiring Apple Intelligence are skipped when it
+is unavailable.
 
 `make app` assembles `dist/Nutola.app`. Publishing a version tag as a GitHub release
 runs **Release app**, which attaches `Nutola.zip` to that release.

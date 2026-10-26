@@ -1,14 +1,15 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class MCPServerTests: XCTestCase {
+final class MCPServerTests {
     var tmp: URL!
     var archive: MeetingArchive!
     var templates: TemplateStore!
     var server: MCPServer!
     var meeting: Meeting!
 
-    override func setUpWithError() throws {
+    init() throws {
         tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-mcp-\(UUID().uuidString)")
         archive = MeetingArchive(root: tmp)
@@ -29,7 +30,7 @@ final class MCPServerTests: XCTestCase {
         meeting = m
     }
 
-    override func tearDown() {
+    deinit {
         try? FileManager.default.removeItem(at: tmp)
     }
 
@@ -40,79 +41,79 @@ final class MCPServerTests: XCTestCase {
         return try JSONSerialization.jsonObject(with: Data(response.utf8)) as! [String: Any]
     }
 
-    func testInitializeEchoesSupportedVersion() throws {
+    @Test func testInitializeEchoesSupportedVersion() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 1, "method": "initialize",
             "params": ["protocolVersion": "2025-06-18", "capabilities": [:]],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["protocolVersion"] as? String, "2025-06-18")
+        #expect(result["protocolVersion"] as? String == "2025-06-18")
         let serverInfo = result["serverInfo"] as! [String: Any]
-        XCTAssertEqual(serverInfo["name"] as? String, "nutola")
-        XCTAssertNotNil((result["capabilities"] as! [String: Any])["tools"])
+        #expect(serverInfo["name"] as? String == "nutola")
+        #expect((result["capabilities"] as! [String: Any])["tools"] != nil)
     }
 
-    func testInitializeOffersLatestForUnknownVersion() throws {
+    @Test func testInitializeOffersLatestForUnknownVersion() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 1, "method": "initialize",
             "params": ["protocolVersion": "1999-01-01", "capabilities": [:]],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["protocolVersion"] as? String, MCPServer.supportedProtocolVersions[0])
+        #expect(result["protocolVersion"] as? String == MCPServer.supportedProtocolVersions[0])
     }
 
-    func testUnknownToolIsProtocolError() throws {
+    @Test func testUnknownToolIsProtocolError() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 10, "method": "tools/call",
             "params": ["name": "explode", "arguments": [:]],
         ])
         let error = resp["error"] as! [String: Any]
-        XCTAssertEqual(error["code"] as? Int, -32602)
+        #expect(error["code"] as? Int == -32602)
     }
 
-    func testInitializedNotificationGetsNoResponse() {
+    @Test func testInitializedNotificationGetsNoResponse() {
         let response = server.handle(
             line: #"{"jsonrpc":"2.0","method":"notifications/initialized"}"#)
-        XCTAssertNil(response)
+        #expect(response == nil)
     }
 
-    func testToolsList() throws {
+    @Test func testToolsList() throws {
         let resp = try roundTrip(["jsonrpc": "2.0", "id": 2, "method": "tools/list"])
         let tools = (resp["result"] as! [String: Any])["tools"] as! [[String: Any]]
         let names = tools.map { $0["name"] as! String }.sorted()
-        XCTAssertEqual(names, [
+        #expect(names == [
             "create_template", "delete_meeting", "delete_template", "get_live_transcript", "get_meeting",
             "get_template", "get_transcript", "list_meetings", "list_templates",
             "regenerate_summary", "rename_template", "search_meetings", "update_summary",
             "update_template",
         ])
         for tool in tools {
-            XCTAssertNotNil(tool["description"])
-            XCTAssertNotNil(tool["inputSchema"])
+            #expect(tool["description"] != nil)
+            #expect(tool["inputSchema"] != nil)
         }
     }
 
-    func testListMeetingsCall() throws {
+    @Test func testListMeetingsCall() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 3, "method": "tools/call",
             "params": ["name": "list_meetings", "arguments": [:]],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["isError"] as? Bool, false)
+        #expect(result["isError"] as? Bool == false)
         let content = result["content"] as! [[String: Any]]
         let text = content[0]["text"] as! String
-        XCTAssertTrue(text.contains("Roadmap sync"))
-        XCTAssertTrue(text.contains(meeting.id.uuidString))
+        #expect(text.contains("Roadmap sync"))
+        #expect(text.contains(meeting.id.uuidString))
     }
 
-    func testSearchAndGetTranscript() throws {
+    @Test func testSearchAndGetTranscript() throws {
         let search = try roundTrip([
             "jsonrpc": "2.0", "id": 4, "method": "tools/call",
             "params": ["name": "search_meetings", "arguments": ["query": "march launch"]],
         ])
         let searchText = (((search["result"] as! [String: Any])["content"]
             as! [[String: Any]])[0]["text"] as! String)
-        XCTAssertTrue(searchText.contains("Roadmap sync"))
+        #expect(searchText.contains("Roadmap sync"))
 
         let transcript = try roundTrip([
             "jsonrpc": "2.0", "id": 5, "method": "tools/call",
@@ -120,21 +121,21 @@ final class MCPServerTests: XCTestCase {
         ])
         let text = (((transcript["result"] as! [String: Any])["content"]
             as! [[String: Any]])[0]["text"] as! String)
-        XCTAssertTrue(text.contains("Priya @ 0:12: Let's move launch to March."))
+        #expect(text.contains("Priya @ 0:12: Let's move launch to March."))
     }
 
-    func testGetMeetingIncludesSummary() throws {
+    @Test func testGetMeetingIncludesSummary() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 6, "method": "tools/call",
             "params": ["name": "get_meeting", "arguments": ["id": meeting.id.uuidString]],
         ])
         let text = (((resp["result"] as! [String: Any])["content"]
             as! [[String: Any]])[0]["text"] as! String)
-        XCTAssertTrue(text.contains("Launch moved to March."))
-        XCTAssertTrue(text.contains("Priya"))
+        #expect(text.contains("Launch moved to March."))
+        #expect(text.contains("Priya"))
     }
 
-    func testReadToolsMatchSharedMeetingService() throws {
+    @Test func testReadToolsMatchSharedMeetingService() throws {
         let reads = MeetingCommandService(archive: archive)
         let cases: [(String, [String: Any], String)] = [
             ("list_meetings", [:], reads.list(limit: 20, offset: 0)),
@@ -151,49 +152,49 @@ final class MCPServerTests: XCTestCase {
             ])
             let result = response["result"] as! [String: Any]
             let content = result["content"] as! [[String: Any]]
-            XCTAssertEqual(content[0]["text"] as? String, value.2, value.0)
+            #expect(content[0]["text"] as? String == value.2, value.0)
         }
     }
 
-    func testToolErrorsAreSoft() throws {
+    @Test func testToolErrorsAreSoft() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 7, "method": "tools/call",
             "params": ["name": "get_meeting", "arguments": ["id": UUID().uuidString]],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["isError"] as? Bool, true)
+        #expect(result["isError"] as? Bool == true)
     }
 
-    func testUnknownMethodIsJSONRPCError() throws {
+    @Test func testUnknownMethodIsJSONRPCError() throws {
         let resp = try roundTrip(["jsonrpc": "2.0", "id": 8, "method": "resources/list"])
         let error = resp["error"] as! [String: Any]
-        XCTAssertEqual(error["code"] as? Int, -32601)
+        #expect(error["code"] as? Int == -32601)
     }
 
-    func testParseError() {
+    @Test func testParseError() {
         let resp = server.handle(line: "not json")
-        XCTAssertTrue(resp!.contains("-32700"))
+        #expect(resp!.contains("-32700"))
     }
 
-    func testPing() throws {
+    @Test func testPing() throws {
         let resp = try roundTrip(["jsonrpc": "2.0", "id": 9, "method": "ping"])
-        XCTAssertNotNil(resp["result"])
+        #expect(resp["result"] != nil)
     }
 
-    func testListTemplatesReflectsSeededBuiltins() throws {
+    @Test func testListTemplatesReflectsSeededBuiltins() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 20, "method": "tools/call",
             "params": ["name": "list_templates", "arguments": [:]],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["isError"] as? Bool, false)
+        #expect(result["isError"] as? Bool == false)
         let text = (((result)["content"] as! [[String: Any]])[0]["text"] as! String)
-        XCTAssertTrue(text.contains("Meeting Notes"))
-        XCTAssertTrue(text.contains("1-on-1"))
-        XCTAssertTrue(text.contains("Interview"))
+        #expect(text.contains("Meeting Notes"))
+        #expect(text.contains("1-on-1"))
+        #expect(text.contains("Interview"))
     }
 
-    func testCreateTemplateHappyPath() throws {
+    @Test func testCreateTemplateHappyPath() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 21, "method": "tools/call",
             "params": [
@@ -202,11 +203,11 @@ final class MCPServerTests: XCTestCase {
             ],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["isError"] as? Bool, false)
-        XCTAssertNotNil(templates.template(named: "Standup"))
+        #expect(result["isError"] as? Bool == false)
+        #expect(templates.template(named: "Standup") != nil)
     }
 
-    func testCreateTemplateCollisionIsError() throws {
+    @Test func testCreateTemplateCollisionIsError() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 22, "method": "tools/call",
             "params": [
@@ -215,10 +216,10 @@ final class MCPServerTests: XCTestCase {
             ],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["isError"] as? Bool, true)
+        #expect(result["isError"] as? Bool == true)
     }
 
-    func testUpdateTemplateOnMissingNameIsError() throws {
+    @Test func testUpdateTemplateOnMissingNameIsError() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 23, "method": "tools/call",
             "params": [
@@ -227,36 +228,36 @@ final class MCPServerTests: XCTestCase {
             ],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["isError"] as? Bool, true)
+        #expect(result["isError"] as? Bool == true)
     }
 
-    func testGetTemplateRoundTrip() throws {
+    @Test func testGetTemplateRoundTrip() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 24, "method": "tools/call",
             "params": ["name": "get_template", "arguments": ["name": "Interview"]],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["isError"] as? Bool, false)
+        #expect(result["isError"] as? Bool == false)
         let text = (((result)["content"] as! [[String: Any]])[0]["text"] as! String)
-        XCTAssertTrue(text.contains("## Candidate Snapshot"))
+        #expect(text.contains("## Candidate Snapshot"))
     }
 
-    func testDeleteTemplateReflectedInList() throws {
+    @Test func testDeleteTemplateReflectedInList() throws {
         let delete = try roundTrip([
             "jsonrpc": "2.0", "id": 25, "method": "tools/call",
             "params": ["name": "delete_template", "arguments": ["name": "1-on-1"]],
         ])
-        XCTAssertEqual((delete["result"] as! [String: Any])["isError"] as? Bool, false)
+        #expect((delete["result"] as! [String: Any])["isError"] as? Bool == false)
 
         let list = try roundTrip([
             "jsonrpc": "2.0", "id": 26, "method": "tools/call",
             "params": ["name": "list_templates", "arguments": [:]],
         ])
         let text = (((list["result"] as! [String: Any])["content"] as! [[String: Any]])[0]["text"] as! String)
-        XCTAssertFalse(text.contains("1-on-1"))
+        #expect(!(text.contains("1-on-1")))
     }
 
-    func testRenameTemplateCaseOnly() throws {
+    @Test func testRenameTemplateCaseOnly() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 27, "method": "tools/call",
             "params": [
@@ -265,8 +266,8 @@ final class MCPServerTests: XCTestCase {
             ],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["isError"] as? Bool, false)
-        XCTAssertEqual(templates.template(named: "interview")?.name, "interview")
+        #expect(result["isError"] as? Bool == false)
+        #expect(templates.template(named: "interview")?.name == "interview")
     }
 
     // MARK: - get_live_transcript
@@ -282,86 +283,81 @@ final class MCPServerTests: XCTestCase {
         return m
     }
 
-    func testLiveTranscriptWhenNothingRecording() {
+    @Test func testLiveTranscriptWhenNothingRecording() {
         // setUp's fixture meeting is .ready, not .recording.
-        XCTAssertEqual(
-            MCPServer.liveTranscriptText(archive: archive),
-            "No meeting is being recorded right now.")
+        #expect(MCPServer.liveTranscriptText(archive: archive) == "No meeting is being recorded right now.")
     }
 
-    func testLiveTranscriptReturnsInProgressMeeting() throws {
+    @Test func testLiveTranscriptReturnsInProgressMeeting() throws {
         _ = try startRecordingMeeting(title: "Standup", live: [
             TranscriptSegment(speakerID: LiveTranscriber.youSpeakerID, start: 1, end: 1, text: "Morning everyone."),
             TranscriptSegment(speakerID: LiveTranscriber.othersSpeakerID, start: 3, end: 3, text: "Hi, ready to start."),
         ])
         let text = MCPServer.liveTranscriptText(archive: archive)
-        XCTAssertTrue(text.contains("Standup"))
-        XCTAssertTrue(text.contains("You @"))
-        XCTAssertTrue(text.contains("Morning everyone."))
-        XCTAssertTrue(text.contains("Others @"))
-        XCTAssertTrue(text.contains("real-time approximation"))
+        #expect(text.contains("Standup"))
+        #expect(text.contains("You @"))
+        #expect(text.contains("Morning everyone."))
+        #expect(text.contains("Others @"))
+        #expect(text.contains("real-time approximation"))
     }
 
-    func testLiveTranscriptRecordingButEmpty() throws {
+    @Test func testLiveTranscriptRecordingButEmpty() throws {
         _ = try startRecordingMeeting(title: "Quiet", live: [])
-        XCTAssertTrue(
-            MCPServer.liveTranscriptText(archive: archive).contains("nothing has been transcribed yet"))
+        #expect(MCPServer.liveTranscriptText(archive: archive).contains("nothing has been transcribed yet"))
     }
 
-    func testLiveTranscriptStaleFileIgnored() throws {
+    @Test func testLiveTranscriptStaleFileIgnored() throws {
         _ = try startRecordingMeeting(title: "Orphan", live: [
             TranscriptSegment(speakerID: LiveTranscriber.youSpeakerID, start: 0, end: 0, text: "hello"),
         ])
         // A crash-orphaned .recording meeting: live.json older than 60s isn't "live".
-        XCTAssertEqual(
-            MCPServer.liveTranscriptText(archive: archive, now: Date().addingTimeInterval(120)),
-            "No meeting is being recorded right now.")
+        #expect(MCPServer.liveTranscriptText(archive: archive, now: Date().addingTimeInterval(120)) == "No meeting is being recorded right now.")
     }
 
-    func testLiveTranscriptWindowsToRecentByDefault() throws {
+    @Test func testLiveTranscriptWindowsToRecentByDefault() throws {
         _ = try startRecordingMeeting(title: "Long call", live: [
             TranscriptSegment(speakerID: LiveTranscriber.youSpeakerID, start: 0, end: 0, text: "Ancient history."),
             TranscriptSegment(speakerID: LiveTranscriber.othersSpeakerID, start: 600, end: 600, text: "Recent point."),
         ])
         let text = MCPServer.liveTranscriptText(archive: archive)
-        XCTAssertTrue(text.contains("Recent point."))
-        XCTAssertFalse(text.contains("Ancient history."))
-        XCTAssertTrue(text.contains("last \(MCPServer.liveDefaultWindowMinutes) minutes"))
-        XCTAssertTrue(text.contains("1-2 sentences")) // brevity steering present
+        #expect(text.contains("Recent point."))
+        #expect(!(text.contains("Ancient history.")))
+        #expect(text.contains("last \(MCPServer.liveDefaultWindowMinutes) minutes"))
+        #expect(text.contains("1-2 sentences")) // brevity steering present
     }
 
-    func testLiveTranscriptMinutesZeroReturnsWholeMeeting() throws {
+    @Test func testLiveTranscriptMinutesZeroReturnsWholeMeeting() throws {
         _ = try startRecordingMeeting(title: "Long call", live: [
             TranscriptSegment(speakerID: LiveTranscriber.youSpeakerID, start: 0, end: 0, text: "Ancient history."),
             TranscriptSegment(speakerID: LiveTranscriber.othersSpeakerID, start: 600, end: 600, text: "Recent point."),
         ])
         let text = MCPServer.liveTranscriptText(archive: archive, minutes: 0)
-        XCTAssertTrue(text.contains("Ancient history."))
-        XCTAssertTrue(text.contains("Recent point."))
+        #expect(text.contains("Ancient history."))
+        #expect(text.contains("Recent point."))
     }
 
     // MARK: - update_summary / regenerate_summary
 
-    func testUpdateSummaryWritesNotes() throws {
+    @Test func testUpdateSummaryWritesNotes() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 30, "method": "tools/call",
             "params": ["name": "update_summary", "arguments": [
                 "id": meeting.id.uuidString, "content": "## New\nRewritten notes.",
             ]],
         ])
-        XCTAssertEqual((resp["result"] as! [String: Any])["isError"] as? Bool, false)
-        XCTAssertEqual(archive.summary(for: meeting.id), "## New\nRewritten notes.")
+        #expect((resp["result"] as! [String: Any])["isError"] as? Bool == false)
+        #expect(archive.summary(for: meeting.id) == "## New\nRewritten notes.")
     }
 
-    func testUpdateSummaryRequiresContent() throws {
+    @Test func testUpdateSummaryRequiresContent() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 31, "method": "tools/call",
             "params": ["name": "update_summary", "arguments": ["id": meeting.id.uuidString]],
         ])
-        XCTAssertEqual((resp["result"] as! [String: Any])["isError"] as? Bool, true)
+        #expect((resp["result"] as! [String: Any])["isError"] as? Bool == true)
     }
 
-    func testRegenerateSummaryWithoutTranscriptErrors() throws {
+    @Test func testRegenerateSummaryWithoutTranscriptErrors() throws {
         var m = Meeting(title: "Empty", createdAt: Date())
         m.state = .ready
         try archive.createFolder(for: m.id)
@@ -371,12 +367,12 @@ final class MCPServerTests: XCTestCase {
             "params": ["name": "regenerate_summary", "arguments": ["id": m.id.uuidString]],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["isError"] as? Bool, true)
+        #expect(result["isError"] as? Bool == true)
         let text = ((result["content"] as! [[String: Any]])[0]["text"] as! String)
-        XCTAssertTrue(text.contains("no transcript"))
+        #expect(text.contains("no transcript"))
     }
 
-    func testRegenerateSummaryUnknownTemplateErrors() throws {
+    @Test func testRegenerateSummaryUnknownTemplateErrors() throws {
         // The fixture meeting HAS a transcript, but an unknown template is rejected
         // before summarization is ever attempted (so this stays deterministic).
         let resp = try roundTrip([
@@ -385,12 +381,12 @@ final class MCPServerTests: XCTestCase {
                 "id": meeting.id.uuidString, "template": "Nonexistent Template",
             ]],
         ])
-        XCTAssertEqual((resp["result"] as! [String: Any])["isError"] as? Bool, true)
+        #expect((resp["result"] as! [String: Any])["isError"] as? Bool == true)
     }
 
     // MARK: - list_meetings pagination
 
-    func testListMeetingsPaginatesWithOffset() throws {
+    @Test func testListMeetingsPaginatesWithOffset() throws {
         // Seed 3 more meetings (4 total incl. setUp's), newest first.
         for i in 0..<3 {
             var m = Meeting(title: "Sync \(i)", createdAt: Date().addingTimeInterval(TimeInterval(i)))
@@ -403,7 +399,7 @@ final class MCPServerTests: XCTestCase {
             "params": ["name": "list_meetings", "arguments": ["limit": 2, "offset": 0]],
         ])
         let text1 = (((page1["result"] as! [String: Any])["content"] as! [[String: Any]])[0]["text"] as! String)
-        XCTAssertTrue(text1.contains("next_offset: 2"), "first page should hint at more")
+        #expect(text1.contains("next_offset: 2"), "first page should hint at more")
 
         let page2 = try roundTrip([
             "jsonrpc": "2.0", "id": 41, "method": "tools/call",
@@ -411,37 +407,37 @@ final class MCPServerTests: XCTestCase {
         ])
         let text2 = (((page2["result"] as! [String: Any])["content"] as! [[String: Any]])[0]["text"] as! String)
         // Last page: no next_offset hint.
-        XCTAssertFalse(text2.contains("next_offset"))
+        #expect(!(text2.contains("next_offset")))
     }
 
-    func testListMeetingsOffsetBeyondEndIsExplicit() throws {
+    @Test func testListMeetingsOffsetBeyondEndIsExplicit() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 42, "method": "tools/call",
             "params": ["name": "list_meetings", "arguments": ["limit": 20, "offset": 999]],
         ])
         let text = (((resp["result"] as! [String: Any])["content"] as! [[String: Any]])[0]["text"] as! String)
-        XCTAssertTrue(text.contains("No more meetings"))
+        #expect(text.contains("No more meetings"))
     }
 
     // MARK: - delete_meeting
 
-    func testDeleteMeetingRemovesIt() throws {
+    @Test func testDeleteMeetingRemovesIt() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 43, "method": "tools/call",
             "params": ["name": "delete_meeting", "arguments": ["id": meeting.id.uuidString]],
         ])
         let result = resp["result"] as! [String: Any]
-        XCTAssertEqual(result["isError"] as? Bool, false)
+        #expect(result["isError"] as? Bool == false)
         let text = ((result["content"] as! [[String: Any]])[0]["text"] as! String)
-        XCTAssertTrue(text.contains("Deleted"))
-        XCTAssertNil(archive.meeting(id: meeting.id))
+        #expect(text.contains("Deleted"))
+        #expect(archive.meeting(id: meeting.id) == nil)
     }
 
-    func testDeleteMeetingUnknownIdIsError() throws {
+    @Test func testDeleteMeetingUnknownIdIsError() throws {
         let resp = try roundTrip([
             "jsonrpc": "2.0", "id": 44, "method": "tools/call",
             "params": ["name": "delete_meeting", "arguments": ["id": UUID().uuidString]],
         ])
-        XCTAssertEqual((resp["result"] as! [String: Any])["isError"] as? Bool, true)
+        #expect((resp["result"] as! [String: Any])["isError"] as? Bool == true)
     }
 }

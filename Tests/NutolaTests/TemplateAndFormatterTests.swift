@@ -1,75 +1,76 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class TemplateTests: XCTestCase {
-    func testFillSubstitutesPlaceholders() {
+struct TemplateTests {
+    @Test func testFillSubstitutesPlaceholders() {
         var m = Meeting(title: "Kickoff", createdAt: Date(timeIntervalSince1970: 1_750_000_000))
         m.attendees = ["Alice", "Bob"]
         m.duration = 65 * 60
         m.sourceApp = "zoom.us"
         let out = TemplateRenderer.fill(
             "# {{title}}\n{{attendees}} · {{duration}} · {{app}}", meeting: m)
-        XCTAssertTrue(out.contains("# Kickoff"))
-        XCTAssertTrue(out.contains("Alice, Bob"))
-        XCTAssertTrue(out.contains("1 hr 5 min"))
-        XCTAssertTrue(out.contains("zoom.us"))
-        XCTAssertFalse(out.contains("{{"))
+        #expect(out.contains("# Kickoff"))
+        #expect(out.contains("Alice, Bob"))
+        #expect(out.contains("1 hr 5 min"))
+        #expect(out.contains("zoom.us"))
+        #expect(!(out.contains("{{")))
     }
 
-    func testFillFallsBackToSpeakersWhenNoAttendees() {
+    @Test func testFillFallsBackToSpeakersWhenNoAttendees() {
         var m = Meeting(title: "Chat", createdAt: Date())
         m.speakers = [Speaker(id: "me", name: "Me", isMe: true), Speaker(id: "s1", name: "Dana")]
         let out = TemplateRenderer.fill("{{attendees}}", meeting: m)
-        XCTAssertEqual(out, "Me, Dana")
+        #expect(out == "Me, Dana")
     }
 
-    func testTemplateStoreSeedsAndRoundTrips() throws {
+    @Test func testTemplateStoreSeedsAndRoundTrips() throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-tpl-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: tmp) }
         let store = TemplateStore(root: tmp)
-        XCTAssertTrue(store.list().map(\.name).contains("Meeting Notes"))
+        #expect(store.list().map(\.name).contains("Meeting Notes"))
         try store.save(SummaryTemplate(name: "Retro", body: "## Went well"))
-        XCTAssertEqual(store.template(named: "Retro")?.body, "## Went well")
+        #expect(store.template(named: "Retro")?.body == "## Went well")
         try store.delete(named: "Retro")
-        XCTAssertNil(store.template(named: "Retro"))
+        #expect(store.template(named: "Retro") == nil)
     }
 
-    func testTemplateRenameRejectsSlashAndKeepsBody() throws {
+    @Test func testTemplateRenameRejectsSlashAndKeepsBody() throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-tpl-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: tmp) }
         let store = TemplateStore(root: tmp)
         try store.save(SummaryTemplate(name: "Weekly", body: "## Agenda"))
-        XCTAssertThrowsError(try store.rename(from: "Weekly", to: "Notes 6/25", body: "## Agenda"))
+        #expect(throws: (any Error).self) { try store.rename(from: "Weekly", to: "Notes 6/25", body: "## Agenda") }
         // The original must survive a rejected rename.
-        XCTAssertEqual(store.template(named: "Weekly")?.body, "## Agenda")
+        #expect(store.template(named: "Weekly")?.body == "## Agenda")
     }
 
-    func testTemplateRenameRefusesToOverwriteAnother() throws {
+    @Test func testTemplateRenameRefusesToOverwriteAnother() throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-tpl-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: tmp) }
         let store = TemplateStore(root: tmp)
         try store.save(SummaryTemplate(name: "A", body: "aaa"))
         try store.save(SummaryTemplate(name: "B", body: "bbb"))
-        XCTAssertThrowsError(try store.rename(from: "A", to: "B", body: "aaa"))
-        XCTAssertEqual(store.template(named: "B")?.body, "bbb") // untouched
-        XCTAssertEqual(store.template(named: "A")?.body, "aaa") // still there
+        #expect(throws: (any Error).self) { try store.rename(from: "A", to: "B", body: "aaa") }
+        #expect(store.template(named: "B")?.body == "bbb") // untouched
+        #expect(store.template(named: "A")?.body == "aaa") // still there
     }
 
-    func testTemplateRenameSucceeds() throws {
+    @Test func testTemplateRenameSucceeds() throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-tpl-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: tmp) }
         let store = TemplateStore(root: tmp)
         try store.save(SummaryTemplate(name: "Old", body: "body"))
         try store.rename(from: "Old", to: "New", body: "body v2")
-        XCTAssertNil(store.template(named: "Old"))
-        XCTAssertEqual(store.template(named: "New")?.body, "body v2")
+        #expect(store.template(named: "Old") == nil)
+        #expect(store.template(named: "New")?.body == "body v2")
     }
 
-    func testTemplateCaseOnlyRename() throws {
+    @Test func testTemplateCaseOnlyRename() throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-tpl-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: tmp) }
@@ -77,12 +78,12 @@ final class TemplateTests: XCTestCase {
         try store.save(SummaryTemplate(name: "notes", body: "b"))
         try store.rename(from: "notes", to: "Notes", body: "b")
         let names = store.list().map(\.name)
-        XCTAssertTrue(names.contains("Notes"))
-        XCTAssertFalse(names.contains("notes")) // the lowercase entry is gone, not duplicated
+        #expect(names.contains("Notes"))
+        #expect(!(names.contains("notes"))) // the lowercase entry is gone, not duplicated
     }
 }
 
-final class FormatterTests: XCTestCase {
+struct FormatterTests {
     let speakers = [
         Speaker(id: "me", name: "Me", isMe: true),
         Speaker(id: "s1", name: "Alice"),
@@ -94,47 +95,47 @@ final class FormatterTests: XCTestCase {
         TranscriptSegment(speakerID: "me", start: 70, end: 72, text: "Let's start."),
     ]
 
-    func testPlainText() {
+    @Test func testPlainText() {
         let text = TranscriptFormatter.plainText(segments, speakers: speakers)
-        XCTAssertEqual(text.split(separator: "\n").count, 4)
-        XCTAssertTrue(text.contains("Me @ 0:00: Hi Alice."))
-        XCTAssertTrue(text.contains("Alice @ 0:03: Hey!"))
-        XCTAssertTrue(text.contains("Me @ 1:10: Let's start."))
+        #expect(text.split(separator: "\n").count == 4)
+        #expect(text.contains("Me @ 0:00: Hi Alice."))
+        #expect(text.contains("Alice @ 0:03: Hey!"))
+        #expect(text.contains("Me @ 1:10: Let's start."))
     }
 
-    func testMarkdownMergesConsecutiveTurns() {
+    @Test func testMarkdownMergesConsecutiveTurns() {
         let md = TranscriptFormatter.markdown(segments, speakers: speakers)
-        XCTAssertTrue(md.contains("Hey! Ready when you are."))
-        XCTAssertEqual(md.components(separatedBy: "**Alice**").count, 2) // one Alice block
+        #expect(md.contains("Hey! Ready when you are."))
+        #expect(md.components(separatedBy: "**Alice**").count == 2) // one Alice block
     }
 
-    func testParseEditedRoundTrip() {
+    @Test func testParseEditedRoundTrip() {
         let text = TranscriptFormatter.plainText(segments, speakers: speakers)
         let (parsed, outSpeakers) = TranscriptFormatter.parseEdited(
             text, originalSegments: segments, speakers: speakers)
-        XCTAssertEqual(parsed.count, 4)
-        XCTAssertEqual(parsed.map(\.text), segments.map(\.text))
-        XCTAssertEqual(parsed.map(\.speakerID), segments.map(\.speakerID))
-        XCTAssertEqual(parsed[3].start, 70)
-        XCTAssertEqual(outSpeakers.count, 2)
+        #expect(parsed.count == 4)
+        #expect(parsed.map(\.text) == segments.map(\.text))
+        #expect(parsed.map(\.speakerID) == segments.map(\.speakerID))
+        #expect(parsed[3].start == 70)
+        #expect(outSpeakers.count == 2)
     }
 
-    func testParseEditedRenamesAndNewSpeaker() {
+    @Test func testParseEditedRenamesAndNewSpeaker() {
         let edited = """
         Me @ 0:00: Hi Alice.
         Bob @ 0:03: Actually it's Bob.
         """
         let (parsed, outSpeakers) = TranscriptFormatter.parseEdited(
             edited, originalSegments: segments, speakers: speakers)
-        XCTAssertEqual(parsed.count, 2)
-        XCTAssertEqual(outSpeakers.count, 3)
-        XCTAssertTrue(outSpeakers.contains { $0.name == "Bob" })
-        XCTAssertEqual(parsed[1].speakerID, outSpeakers.first { $0.name == "Bob" }!.id)
+        #expect(parsed.count == 2)
+        #expect(outSpeakers.count == 3)
+        #expect(outSpeakers.contains { $0.name == "Bob" })
+        #expect(parsed[1].speakerID == outSpeakers.first { $0.name == "Bob" }!.id)
         // reused original end time for the matching 0:03 segment
-        XCTAssertEqual(parsed[1].end, 5)
+        #expect(parsed[1].end == 5)
     }
 
-    func testParseEditedKeepsDistinctSpeakersSharingAName() {
+    @Test func testParseEditedKeepsDistinctSpeakersSharingAName() {
         // Two speakers with the same display name must NOT be merged by a no-op
         // save — identity resolves by timestamp for unchanged names.
         let dupSpeakers = [
@@ -148,17 +149,17 @@ final class FormatterTests: XCTestCase {
         let text = TranscriptFormatter.plainText(segs, speakers: dupSpeakers)
         let (parsed, _) = TranscriptFormatter.parseEdited(
             text, originalSegments: segs, speakers: dupSpeakers)
-        XCTAssertEqual(parsed.map(\.speakerID), ["me", "s1"])
+        #expect(parsed.map(\.speakerID) == ["me", "s1"])
     }
 
-    func testParseEditedContinuationLines() {
+    @Test func testParseEditedContinuationLines() {
         let edited = """
         Me @ 0:00: First line
         and a continuation.
         """
         let (parsed, _) = TranscriptFormatter.parseEdited(
             edited, originalSegments: [], speakers: speakers)
-        XCTAssertEqual(parsed.count, 1)
-        XCTAssertEqual(parsed[0].text, "First line and a continuation.")
+        #expect(parsed.count == 1)
+        #expect(parsed[0].text == "First line and a continuation.")
     }
 }

@@ -1,7 +1,8 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class GitHubGistTests: XCTestCase {
+struct GitHubGistTests {
     private let sha = "abcdef0123456789abcdef0123456789abcdef01"
 
     // MARK: - renderedURL (opaque notes.nutola.to token)
@@ -10,64 +11,58 @@ final class GitHubGistTests: XCTestCase {
     // (workers/notes-proxy/src/index.js + test). Regenerate both together if the
     // wire format ever changes.
 
-    func testMapsModernThirtyTwoHexGist() {
+    @Test func testMapsModernThirtyTwoHexGist() {
         let raw = "https://gist.githubusercontent.com/sample-user/" +
             "0123456789abcdef0123456789abcdef/raw/\(sha)/meeting.html"
-        XCTAssertEqual(
-            GitHubGist.renderedURL(fromRaw: raw)?.absoluteString,
-            "https://notes.nutola.to/C3NhbXBsZS11c2VyASNFZ4mrze8BI0VniavN76vN7wEjRWeJq83vASNFZ4mrze8B")
+        #expect(GitHubGist.renderedURL(fromRaw: raw)?.absoluteString == "https://notes.nutola.to/C3NhbXBsZS11c2VyASNFZ4mrze8BI0VniavN76vN7wEjRWeJq83vASNFZ4mrze8B")
     }
 
-    func testMapsLegacyTwentyHexGist() {
+    @Test func testMapsLegacyTwentyHexGist() {
         let raw = "https://gist.githubusercontent.com/sample-user/" +
             "0123456789abcdef0123/raw/\(sha)/meeting.html"
-        XCTAssertEqual(
-            GitHubGist.renderedURL(fromRaw: raw)?.absoluteString,
-            "https://notes.nutola.to/C3NhbXBsZS11c2VyASNFZ4mrze8BI6vN7wEjRWeJq83vASNFZ4mrze8B")
+        #expect(GitHubGist.renderedURL(fromRaw: raw)?.absoluteString == "https://notes.nutola.to/C3NhbXBsZS11c2VyASNFZ4mrze8BI6vN7wEjRWeJq83vASNFZ4mrze8B")
     }
 
-    func testRenderedTokenRoundTripsToGistCoordinates() {
+    @Test func testRenderedTokenRoundTripsToGistCoordinates() {
         let raw = "https://gist.githubusercontent.com/sample-user/" +
             "0123456789abcdef0123456789abcdef/raw/\(sha)/meeting.html"
         let token = GitHubGist.renderedURL(fromRaw: raw)!.lastPathComponent
-        XCTAssertEqual(
-            GistLinkToken.decode(token),
-            GistLinkToken.Decoded(
+        #expect(GistLinkToken.decode(token) == GistLinkToken.Decoded(
                 user: "sample-user",
                 gistID: "0123456789abcdef0123456789abcdef",
                 sha: sha))
     }
 
-    func testRenderedURLRejectsNonGistRawURLs() {
+    @Test func testRenderedURLRejectsNonGistRawURLs() {
         // Empty (the shape publish() sees when gh's raw_url lookup comes back blank).
-        XCTAssertNil(GitHubGist.renderedURL(fromRaw: ""))
-        XCTAssertNil(GitHubGist.renderedURL(fromRaw: "https://example.com/foo"))
+        #expect(GitHubGist.renderedURL(fromRaw: "") == nil)
+        #expect(GitHubGist.renderedURL(fromRaw: "https://example.com/foo") == nil)
         // Wrong host.
-        XCTAssertNil(GitHubGist.renderedURL(
-            fromRaw: "https://gist.github.com/sample-user/0123456789abcdef0123/raw/\(sha)/meeting.html"))
+        #expect(GitHubGist.renderedURL(
+            fromRaw: "https://gist.github.com/sample-user/0123456789abcdef0123/raw/\(sha)/meeting.html") == nil)
         // SHA too short.
-        XCTAssertNil(GitHubGist.renderedURL(
-            fromRaw: "https://gist.githubusercontent.com/sample-user/0123456789abcdef0123/raw/abcd/meeting.html"))
+        #expect(GitHubGist.renderedURL(
+            fromRaw: "https://gist.githubusercontent.com/sample-user/0123456789abcdef0123/raw/abcd/meeting.html") == nil)
     }
 
     // MARK: - GistLinkToken
 
-    func testTokenRoundTripsUppercaseUser() {
+    @Test func testTokenRoundTripsUppercaseUser() {
         let decoded = GistLinkToken.Decoded(
             user: "Some-User", gistID: "0123456789abcdef0123456789abcdef", sha: sha)
         let token = GistLinkToken.encode(user: decoded.user, gistID: decoded.gistID, sha: decoded.sha)!
-        XCTAssertEqual(GistLinkToken.decode(token), decoded)
+        #expect(GistLinkToken.decode(token) == decoded)
     }
 
-    func testTokenEncodeRejectsBadInput() {
+    @Test func testTokenEncodeRejectsBadInput() {
         // Non-hex / odd-length gist id.
-        XCTAssertNil(GistLinkToken.encode(user: "u", gistID: "xyz", sha: sha))
+        #expect(GistLinkToken.encode(user: "u", gistID: "xyz", sha: sha) == nil)
         // SHA that isn't 20 bytes.
-        XCTAssertNil(GistLinkToken.encode(user: "u", gistID: "0123456789abcdef0123", sha: "abcd"))
+        #expect(GistLinkToken.encode(user: "u", gistID: "0123456789abcdef0123", sha: "abcd") == nil)
     }
 
-    func testTokenDecodeRejectsGarbage() {
-        XCTAssertNil(GistLinkToken.decode("!!!not-base64!!!"))
-        XCTAssertNil(GistLinkToken.decode(""))
+    @Test func testTokenDecodeRejectsGarbage() {
+        #expect(GistLinkToken.decode("!!!not-base64!!!") == nil)
+        #expect(GistLinkToken.decode("") == nil)
     }
 }

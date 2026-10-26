@@ -1,4 +1,5 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
 // MARK: - #87: MenuBarTitleTruncator
@@ -14,31 +15,31 @@ import XCTest
 ///   - the title budget never collapses to zero (clamped to a minimum), so a
 ///     very long countdown can't starve the title to an empty string
 @MainActor
-final class MenuBarTitleTruncatorTests: XCTestCase {
+struct MenuBarTitleTruncatorTests {
     private func label(title: String, countdown: String) -> String {
         MenuBarTitleTruncator.label(for: MenuBarUpcomingEvent(title: title, countdown: countdown))
     }
 
-    func testLongTitleTruncated() {
+    @Test func testLongTitleTruncated() {
         // A title far wider than the ~148pt menu-bar budget is truncated. The
         // truncated form must end with the ".." ellipsis and retain the suffix.
         let long = String(repeating: "Quarterly Business Review ", count: 10)
         let result = label(title: long, countdown: "in 5m")
-        XCTAssertTrue(result.hasSuffix("in 5m"), "Suffix must be preserved — got \(result)")
-        XCTAssertTrue(result.contains(".."), "Truncated title must include the ellipsis — got \(result)")
+        #expect(result.hasSuffix("in 5m"), "Suffix must be preserved — got \(result)")
+        #expect(result.contains(".."), "Truncated title must include the ellipsis — got \(result)")
         // Truncated form must be shorter than the untruncated concatenation.
         let untruncated = long + "•in 5m"
-        XCTAssertLessThan(result.count, untruncated.count, "Truncation must reduce length — got \(result)")
+        #expect(result.count < untruncated.count, "Truncation must reduce length — got \(result)")
     }
 
-    func testShortTitleUnchanged() {
+    @Test func testShortTitleUnchanged() {
         // A short title fits within the budget and passes through verbatim; the
         // suffix is still appended.
         let result = label(title: "Standup", countdown: "in 5m")
-        XCTAssertEqual(result, "Standup•in 5m")
+        #expect(result == "Standup•in 5m")
     }
 
-    func testZeroWidthBudget() {
+    @Test func testZeroWidthBudget() {
         // The title budget is clamped to a minimum (36pt) so a very long
         // countdown can't starve the title to zero width. The result must
         // still contain a non-empty title fragment plus the suffix — never an
@@ -47,10 +48,10 @@ final class MenuBarTitleTruncatorTests: XCTestCase {
         let hugeCountdown = String(repeating: "in 9999h ", count: 50)
         let result = label(title: "Q4 Review", countdown: hugeCountdown)
         // Suffix is always appended.
-        XCTAssertTrue(result.hasSuffix(hugeCountdown), "Suffix must be preserved verbatim — got \(result)")
+        #expect(result.hasSuffix(hugeCountdown), "Suffix must be preserved verbatim — got \(result)")
         // The title portion (everything before the suffix) must be non-empty:
         // the floor budget guarantees at least one character of title survives.
         let title = String(result.dropLast(hugeCountdown.count))
-        XCTAssertFalse(title.isEmpty, "Title must not collapse to empty under a huge countdown — got \(title)")
+        #expect(!(title.isEmpty), "Title must not collapse to empty under a huge countdown — got \(title)")
     }
 }

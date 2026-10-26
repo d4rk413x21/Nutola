@@ -1,23 +1,23 @@
 import Foundation
-import XCTest
+import Testing
 @testable import Nutola
 
-final class TranscriptionLocalesTests: XCTestCase {
-    func testItalianIsPreferredForAutomaticTranscription() {
+struct TranscriptionLocalesTests {
+    @Test func testItalianIsPreferredForAutomaticTranscription() {
         let ids = TranscriptionLocales.primaryCandidateIdentifiers()
-        XCTAssertEqual(ids.first, "it-IT")
-        XCTAssertEqual(Set(ids).count, ids.count)
+        #expect(ids.first == "it-IT")
+        #expect(Set(ids).count == ids.count)
     }
 
-    func testItalianAndFallbackAssetsIncluded() {
+    @Test func testItalianAndFallbackAssetsIncluded() {
         let ids = TranscriptionLocales.assetCandidateIdentifiers()
-        XCTAssertTrue(ids.contains("it-IT"))
-        XCTAssertTrue(ids.contains("en-US"))
-        XCTAssertTrue(ids.contains("pt-BR"))
-        XCTAssertEqual(Set(ids).count, ids.count)
+        #expect(ids.contains("it-IT"))
+        #expect(ids.contains("en-US"))
+        #expect(ids.contains("pt-BR"))
+        #expect(Set(ids).count == ids.count)
     }
 
-    func testReadsPerMeetingLocaleFromArchive() throws {
+    @Test func testReadsPerMeetingLocaleFromArchive() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-locale-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -29,11 +29,8 @@ final class TranscriptionLocalesTests: XCTestCase {
         let data = try JSONEncoder().encode(mapping)
         try data.write(to: dir.appendingPathComponent("overrides.json"))
 
-        XCTAssertEqual(
-            TranscriptionLocales.storedLocale(forMeetingID: meetingID, root: root)?
-                .identifier(.bcp47),
-            "it-IT"
-        )
-        XCTAssertNil(TranscriptionLocales.storedLocale(forMeetingID: UUID(), root: root))
+        #expect(TranscriptionLocales.storedLocale(forMeetingID: meetingID, root: root)?
+                .identifier(.bcp47) == "it-IT")
+        #expect(TranscriptionLocales.storedLocale(forMeetingID: UUID(), root: root) == nil)
     }
 }

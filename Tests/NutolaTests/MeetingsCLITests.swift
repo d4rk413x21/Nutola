@@ -1,37 +1,29 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class MeetingsCLITests: XCTestCase {
+struct MeetingsCLITests {
     private let id = "123E4567-E89B-12D3-A456-426614174000"
 
-    func testParsesEveryCommand() throws {
-        XCTAssertEqual(try MeetingsCLI.parse(arguments: ["help"]), .help)
-        XCTAssertEqual(try MeetingsCLI.parse(arguments: ["list"]), .list(limit: 20, offset: 0))
-        XCTAssertEqual(
-            try MeetingsCLI.parse(arguments: ["list", "--limit", "250", "--offset", "4"]),
-            .list(limit: 200, offset: 4)
-        )
-        XCTAssertEqual(
-            try MeetingsCLI.parse(arguments: ["search", "device", "token", "--limit", "5", "--offset", "2"]),
-            .search(query: "device token", limit: 5, offset: 2)
-        )
-        XCTAssertEqual(try MeetingsCLI.parse(arguments: ["show", id]), .show(id: id))
-        XCTAssertEqual(try MeetingsCLI.parse(arguments: ["transcript", id]), .transcript(id: id))
-        XCTAssertEqual(try MeetingsCLI.parse(arguments: ["live"]), .live(minutes: nil))
-        XCTAssertEqual(try MeetingsCLI.parse(arguments: ["live", "--minutes", "0"]), .live(minutes: 0))
+    @Test func testParsesEveryCommand() throws {
+        #expect(try MeetingsCLI.parse(arguments: ["help"]) == .help)
+        #expect(try MeetingsCLI.parse(arguments: ["list"]) == .list(limit: 20, offset: 0))
+        #expect(try MeetingsCLI.parse(arguments: ["list", "--limit", "250", "--offset", "4"]) == .list(limit: 200, offset: 4))
+        #expect(try MeetingsCLI.parse(arguments: ["search", "device", "token", "--limit", "5", "--offset", "2"]) == .search(query: "device token", limit: 5, offset: 2))
+        #expect(try MeetingsCLI.parse(arguments: ["show", id]) == .show(id: id))
+        #expect(try MeetingsCLI.parse(arguments: ["transcript", id]) == .transcript(id: id))
+        #expect(try MeetingsCLI.parse(arguments: ["live"]) == .live(minutes: nil))
+        #expect(try MeetingsCLI.parse(arguments: ["live", "--minutes", "0"]) == .live(minutes: 0))
     }
 
-    func testMeetingsPrefixAndNoCommandShowHelp() throws {
-        XCTAssertEqual(try MeetingsCLI.parse(arguments: []), .help)
-        XCTAssertEqual(try MeetingsCLI.parse(arguments: ["meetings"]), .help)
-        XCTAssertEqual(try MeetingsCLI.parse(arguments: ["meetings", "help"]), .help)
-        XCTAssertEqual(
-            try MeetingsCLI.parse(arguments: ["meetings", "list", "--limit", "3"]),
-            .list(limit: 3, offset: 0)
-        )
+    @Test func testMeetingsPrefixAndNoCommandShowHelp() throws {
+        #expect(try MeetingsCLI.parse(arguments: []) == .help)
+        #expect(try MeetingsCLI.parse(arguments: ["meetings"]) == .help)
+        #expect(try MeetingsCLI.parse(arguments: ["meetings", "help"]) == .help)
+        #expect(try MeetingsCLI.parse(arguments: ["meetings", "list", "--limit", "3"]) == .list(limit: 3, offset: 0))
     }
 
-    func testRejectsMalformedSyntaxAndValues() {
+    @Test func testRejectsMalformedSyntaxAndValues() {
         assertUsageError(["unknown"], contains: "Unknown meetings command")
         assertUsageError(["list", "--wat"], contains: "Unknown option")
         assertUsageError(["list", "--limit"], contains: "requires a value")
@@ -46,7 +38,7 @@ final class MeetingsCLITests: XCTestCase {
         assertUsageError(["live", "--minutes", "-2"], contains: "must be non-negative")
     }
 
-    func testSuccessfulRunnerWritesOnlyStdout() throws {
+    @Test func testSuccessfulRunnerWritesOnlyStdout() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-cli-success-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -66,13 +58,13 @@ final class MeetingsCLITests: XCTestCase {
             error: { errors.append($0) }
         )
 
-        XCTAssertEqual(status, 0)
-        XCTAssertEqual(errors, [])
-        XCTAssertEqual(output.count, 1)
-        XCTAssertTrue(output[0].contains("Daily sync"))
+        #expect(status == 0)
+        #expect(errors == [])
+        #expect(output.count == 1)
+        #expect(output[0].contains("Daily sync"))
     }
 
-    func testHelpWritesOnlyStdout() {
+    @Test func testHelpWritesOnlyStdout() {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-cli-help-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -86,12 +78,12 @@ final class MeetingsCLITests: XCTestCase {
             error: { errors.append($0) }
         )
 
-        XCTAssertEqual(status, 0)
-        XCTAssertTrue(output.joined().contains("Nutola meetings list"))
-        XCTAssertEqual(errors, [])
+        #expect(status == 0)
+        #expect(output.joined().contains("Nutola meetings list"))
+        #expect(errors == [])
     }
 
-    func testParserFailureWritesUsageToStderrAndReturnsTwo() {
+    @Test func testParserFailureWritesUsageToStderrAndReturnsTwo() {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-cli-parser-error-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -105,13 +97,13 @@ final class MeetingsCLITests: XCTestCase {
             error: { errors.append($0) }
         )
 
-        XCTAssertEqual(status, 2)
-        XCTAssertEqual(output, [])
-        XCTAssertTrue(errors.joined().contains("must be non-negative"))
-        XCTAssertTrue(errors.joined().contains("Usage:"))
+        #expect(status == 2)
+        #expect(output == [])
+        #expect(errors.joined().contains("must be non-negative"))
+        #expect(errors.joined().contains("Usage:"))
     }
 
-    func testServiceFailureWritesOnlyStderrAndReturnsOne() {
+    @Test func testServiceFailureWritesOnlyStderrAndReturnsOne() {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-cli-service-error-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -125,19 +117,21 @@ final class MeetingsCLITests: XCTestCase {
             error: { errors.append($0) }
         )
 
-        XCTAssertEqual(status, 1)
-        XCTAssertEqual(output, [])
-        XCTAssertEqual(errors, ["Error: No meeting with id \(id)"])
+        #expect(status == 1)
+        #expect(output == [])
+        #expect(errors == ["Error: No meeting with id \(id)"])
     }
 
     private func assertUsageError(
         _ arguments: [String],
         contains expected: String,
-        file: StaticString = #filePath,
-        line: UInt = #line
+        sourceLocation: SourceLocation = #_sourceLocation
     ) {
-        XCTAssertThrowsError(try MeetingsCLI.parse(arguments: arguments), file: file, line: line) { error in
-            XCTAssertTrue(error.localizedDescription.contains(expected), "\(error)", file: file, line: line)
+        do {
+            _ = try MeetingsCLI.parse(arguments: arguments)
+            Issue.record("Expected a usage error", sourceLocation: sourceLocation)
+        } catch {
+            #expect(error.localizedDescription.contains(expected), "\(error)", sourceLocation: sourceLocation)
         }
     }
 }

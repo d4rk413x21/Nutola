@@ -1,9 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
 @MainActor
-final class MeetingResumeTests: XCTestCase {
-    func testMeetingForCalendarEventMatchesInstanceStart() {
+struct MeetingResumeTests {
+    @Test func testMeetingForCalendarEventMatchesInstanceStart() {
         let calendar = CalendarStore()
         let event = ArchitectureFixtures.sampleCalendarEvent(id: "evt-1", title: "All Hands")
         var otherDay = Meeting(title: "Old", createdAt: Date())
@@ -14,10 +15,10 @@ final class MeetingResumeTests: XCTestCase {
         today.calendarEventStart = event.start
 
         let match = calendar.meetingForCalendarEvent(event, in: [otherDay, today])
-        XCTAssertEqual(match?.id, today.id)
+        #expect(match?.id == today.id)
     }
 
-    func testMeetingForCalendarEventPrefersLongestRecording() {
+    @Test func testMeetingForCalendarEventPrefersLongestRecording() {
         let calendar = CalendarStore()
         let event = ArchitectureFixtures.sampleCalendarEvent()
         var brief = Meeting(title: "Brief", createdAt: Date())
@@ -30,10 +31,10 @@ final class MeetingResumeTests: XCTestCase {
         longest.duration = 1800
 
         let match = calendar.meetingForCalendarEvent(event, in: [brief, longest])
-        XCTAssertEqual(match?.id, longest.id)
+        #expect(match?.id == longest.id)
     }
 
-    func testCanResumeRecordingIncludesReadyPrepAndProcessingOrphan() {
+    @Test func testCanResumeRecordingIncludesReadyPrepAndProcessingOrphan() {
         var prep = Meeting(title: "Prep", createdAt: Date())
         prep.state = .prep
         var ready = Meeting(title: "Ready", createdAt: Date())
@@ -46,16 +47,16 @@ final class MeetingResumeTests: XCTestCase {
         var processingOrphan = Meeting(title: "Finalizing", createdAt: Date())
         processingOrphan.state = .processing
 
-        XCTAssertTrue(prep.canResumeRecording(isRecording: false))
-        XCTAssertTrue(ready.canResumeRecording(isRecording: false))
-        XCTAssertFalse(recording.canResumeRecording(isRecording: false))
-        XCTAssertTrue(processingOrphan.canResumeRecording(isRecording: false))
+        #expect(prep.canResumeRecording(isRecording: false))
+        #expect(ready.canResumeRecording(isRecording: false))
+        #expect(!(recording.canResumeRecording(isRecording: false)))
+        #expect(processingOrphan.canResumeRecording(isRecording: false))
         // Never resumable while a session is actually live.
-        XCTAssertFalse(processingOrphan.canResumeRecording(isRecording: true))
-        XCTAssertFalse(ready.canResumeRecording(isRecording: true))
+        #expect(!(processingOrphan.canResumeRecording(isRecording: true)))
+        #expect(!(ready.canResumeRecording(isRecording: true)))
     }
 
-    func testProcessMeetingSkipsWhenRecordingResumed() async {
+    @Test func testProcessMeetingSkipsWhenRecordingResumed() async {
         let meetings = MockMeetingRepository()
         let meeting = Meeting(title: "Resumed", createdAt: Date())
         try? meetings.archive.createFolder(for: meeting.id)
@@ -74,7 +75,7 @@ final class MeetingResumeTests: XCTestCase {
         meetings.upsert(resumed)
         await task.value
 
-        XCTAssertEqual(meetings.meeting(id: meeting.id)?.state, .recording)
+        #expect(meetings.meeting(id: meeting.id)?.state == .recording)
     }
 }
 

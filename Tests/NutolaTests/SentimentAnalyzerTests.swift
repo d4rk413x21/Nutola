@@ -1,10 +1,11 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class SentimentAnalyzerTests: XCTestCase {
+struct SentimentAnalyzerTests {
     // MARK: - Positive
 
-    func testPositiveSentiment() {
+    @Test func testPositiveSentiment() {
         let speakers = [Speaker(id: "me", name: "Me", isMe: true)]
         let segments = [
             TranscriptSegment(speakerID: "me", start: 0, end: 5,
@@ -12,16 +13,16 @@ final class SentimentAnalyzerTests: XCTestCase {
         ]
         let results = SentimentAnalyzer.analyze(segments: segments, speakers: speakers)
 
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results[0].sentiment, .positive)
-        XCTAssertEqual(results[0].speakerID, "me")
-        XCTAssertEqual(results[0].speakerName, "Me")
-        XCTAssertEqual(results[0].segmentIndex, 0)
+        #expect(results.count == 1)
+        #expect(results[0].sentiment == .positive)
+        #expect(results[0].speakerID == "me")
+        #expect(results[0].speakerName == "Me")
+        #expect(results[0].segmentIndex == 0)
     }
 
     // MARK: - Negative
 
-    func testNegativeSentiment() {
+    @Test func testNegativeSentiment() {
         let speakers = [Speaker(id: "s1", name: "Alice")]
         let segments = [
             TranscriptSegment(speakerID: "s1", start: 0, end: 5,
@@ -29,14 +30,14 @@ final class SentimentAnalyzerTests: XCTestCase {
         ]
         let results = SentimentAnalyzer.analyze(segments: segments, speakers: speakers)
 
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results[0].sentiment, .negative)
-        XCTAssertEqual(results[0].speakerName, "Alice")
+        #expect(results.count == 1)
+        #expect(results[0].sentiment == .negative)
+        #expect(results[0].speakerName == "Alice")
     }
 
     // MARK: - Critical (precedence over negative and positive)
 
-    func testCriticalSentiment() {
+    @Test func testCriticalSentiment() {
         let speakers = [Speaker(id: "s1", name: "Alice")]
         let segments = [
             TranscriptSegment(speakerID: "s1", start: 0, end: 5,
@@ -44,11 +45,11 @@ final class SentimentAnalyzerTests: XCTestCase {
         ]
         let results = SentimentAnalyzer.analyze(segments: segments, speakers: speakers)
 
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results[0].sentiment, .critical)
+        #expect(results.count == 1)
+        #expect(results[0].sentiment == .critical)
     }
 
-    func testCriticalBeatsNegativeWhenBothPresent() {
+    @Test func testCriticalBeatsNegativeWhenBothPresent() {
         // Precedence: critical > negative > positive. A segment mentioning
         // "problem" (negative) and "blocker" (critical) reads critical.
         let speakers = [Speaker(id: "s1", name: "Alice")]
@@ -57,12 +58,12 @@ final class SentimentAnalyzerTests: XCTestCase {
                              text: "We have a problem and this is a blocker."),
         ]
         let results = SentimentAnalyzer.analyze(segments: segments, speakers: speakers)
-        XCTAssertEqual(results[0].sentiment, .critical)
+        #expect(results[0].sentiment == .critical)
     }
 
     // MARK: - Neutral default
 
-    func testNeutralDefault() {
+    @Test func testNeutralDefault() {
         let speakers = [Speaker(id: "me", name: "Me", isMe: true)]
         let segments = [
             TranscriptSegment(speakerID: "me", start: 0, end: 5,
@@ -70,14 +71,14 @@ final class SentimentAnalyzerTests: XCTestCase {
         ]
         let results = SentimentAnalyzer.analyze(segments: segments, speakers: speakers)
 
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results[0].sentiment, .neutral)
-        XCTAssertEqual(results[0].score, 0, accuracy: 0.0001)
+        #expect(results.count == 1)
+        #expect(results[0].sentiment == .neutral)
+        #expect(abs((results[0].score) - (0)) <= 0.0001)
     }
 
     // MARK: - Score calculation
 
-    func testScoreCalculation() {
+    @Test func testScoreCalculation() {
         let speakers = [Speaker(id: "me", name: "Me", isMe: true)]
         // 6 words, 2 positive keywords → score = 2/6 ≈ 0.333.
         let segments = [
@@ -86,15 +87,15 @@ final class SentimentAnalyzerTests: XCTestCase {
         ]
         let results = SentimentAnalyzer.analyze(segments: segments, speakers: speakers)
 
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results[0].sentiment, .positive)
-        XCTAssertEqual(results[0].score, 2.0 / 6.0, accuracy: 0.0001)
+        #expect(results.count == 1)
+        #expect(results[0].sentiment == .positive)
+        #expect(abs((results[0].score) - (2.0 / 6.0)) <= 0.0001)
         // Bounded in [0, 1].
-        XCTAssertGreaterThanOrEqual(results[0].score, 0)
-        XCTAssertLessThanOrEqual(results[0].score, 1)
+        #expect(results[0].score >= 0)
+        #expect(results[0].score <= 1)
     }
 
-    func testScoreIsBounded() {
+    @Test func testScoreIsBounded() {
         let speakers = [Speaker(id: "me", name: "Me", isMe: true)]
         // Every word is a keyword → score should be 1.0, never above.
         let segments = [
@@ -102,31 +103,31 @@ final class SentimentAnalyzerTests: XCTestCase {
                              text: "great love agree"),
         ]
         let results = SentimentAnalyzer.analyze(segments: segments, speakers: speakers)
-        XCTAssertEqual(results[0].score, 1.0, accuracy: 0.0001)
+        #expect(abs((results[0].score) - (1.0)) <= 0.0001)
     }
 
     // MARK: - Empty input
 
-    func testEmptySegments() {
+    @Test func testEmptySegments() {
         let speakers = [Speaker(id: "me", name: "Me", isMe: true)]
         let results = SentimentAnalyzer.analyze(segments: [], speakers: speakers)
-        XCTAssertTrue(results.isEmpty)
+        #expect(results.isEmpty)
     }
 
-    func testEmptySpeakersStillClassifies() {
+    @Test func testEmptySpeakersStillClassifies() {
         // No speakers list — name falls back to speakerID.
         let segments = [
             TranscriptSegment(speakerID: "ghost", start: 0, end: 3, text: "great point"),
         ]
         let results = SentimentAnalyzer.analyze(segments: segments, speakers: [])
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results[0].sentiment, .positive)
-        XCTAssertEqual(results[0].speakerName, "ghost")
+        #expect(results.count == 1)
+        #expect(results[0].sentiment == .positive)
+        #expect(results[0].speakerName == "ghost")
     }
 
     // MARK: - Multiple speakers
 
-    func testMultipleSpeakers() {
+    @Test func testMultipleSpeakers() {
         let speakers = [
             Speaker(id: "me", name: "Me", isMe: true),
             Speaker(id: "s1", name: "Alice"),
@@ -142,26 +143,26 @@ final class SentimentAnalyzerTests: XCTestCase {
         ]
         let results = SentimentAnalyzer.analyze(segments: segments, speakers: speakers)
 
-        XCTAssertEqual(results.count, 3)
-        XCTAssertEqual(results[0].speakerID, "me")
-        XCTAssertEqual(results[0].sentiment, .positive)
-        XCTAssertEqual(results[1].speakerID, "s1")
-        XCTAssertEqual(results[1].sentiment, .negative)
-        XCTAssertEqual(results[2].speakerID, "s2")
-        XCTAssertEqual(results[2].sentiment, .neutral)
+        #expect(results.count == 3)
+        #expect(results[0].speakerID == "me")
+        #expect(results[0].sentiment == .positive)
+        #expect(results[1].speakerID == "s1")
+        #expect(results[1].sentiment == .negative)
+        #expect(results[2].speakerID == "s2")
+        #expect(results[2].sentiment == .neutral)
 
         // Names resolved from the speakers list, not bare IDs.
-        XCTAssertEqual(results[0].speakerName, "Me")
-        XCTAssertEqual(results[1].speakerName, "Alice")
-        XCTAssertEqual(results[2].speakerName, "Bob")
+        #expect(results[0].speakerName == "Me")
+        #expect(results[1].speakerName == "Alice")
+        #expect(results[2].speakerName == "Bob")
 
         // Segment indices track the input order.
-        XCTAssertEqual(results.map(\.segmentIndex), [0, 1, 2])
+        #expect(results.map(\.segmentIndex) == [0, 1, 2])
     }
 
     // MARK: - Punctuation robustness
 
-    func testPunctuationStripped() {
+    @Test func testPunctuationStripped() {
         // "great!" and "love," should still register as keywords.
         let speakers = [Speaker(id: "me", name: "Me", isMe: true)]
         let segments = [
@@ -169,27 +170,27 @@ final class SentimentAnalyzerTests: XCTestCase {
                              text: "great! love, agree."),
         ]
         let results = SentimentAnalyzer.analyze(segments: segments, speakers: speakers)
-        XCTAssertEqual(results[0].sentiment, .positive)
-        XCTAssertEqual(results[0].score, 1.0, accuracy: 0.0001)
+        #expect(results[0].sentiment == .positive)
+        #expect(abs((results[0].score) - (1.0)) <= 0.0001)
     }
 
     // MARK: - Identifiable
 
-    func testSpeakerSentimentID() {
+    @Test func testSpeakerSentimentID() {
         let entry = SpeakerSentiment(
             speakerID: "s1", speakerName: "Alice",
             sentiment: .positive, score: 0.5, segmentIndex: 3)
-        XCTAssertEqual(entry.id, "s1-3")
+        #expect(entry.id == "s1-3")
     }
 
     // MARK: - Sentiment metadata
 
-    func testSentimentEmojiAndColorNonEmpty() {
+    @Test func testSentimentEmojiAndColorNonEmpty() {
         // Every case has a distinct emoji and a 6-hex color.
         for sentiment in Sentiment.allCases {
-            XCTAssertFalse(sentiment.emoji.isEmpty, "emoji empty for \(sentiment)")
-            XCTAssertTrue(sentiment.color.hasPrefix("#"), "color not hex for \(sentiment)")
-            XCTAssertEqual(sentiment.color.count, 7, "color not 6-hex for \(sentiment)")
+            #expect(!(sentiment.emoji.isEmpty), "emoji empty for \(sentiment)")
+            #expect(sentiment.color.hasPrefix("#"), "color not hex for \(sentiment)")
+            #expect(sentiment.color.count == 7, "color not 6-hex for \(sentiment)")
         }
     }
 }

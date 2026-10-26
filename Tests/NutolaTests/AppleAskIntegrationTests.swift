@@ -1,12 +1,10 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class AppleAskIntegrationTests: XCTestCase {
-    func testAnswerLibraryQuestionWithEmbeddedContext() async throws {
-        guard AppleSummarizer.isAvailable else {
-            throw XCTSkip(AppleSummarizer.unavailableReason ?? "Apple Intelligence unavailable")
-        }
-
+@Suite(.enabled(if: AppleSummarizer.isAvailable, "Requires Apple Intelligence"))
+struct AppleAskIntegrationTests {
+    @Test func testAnswerLibraryQuestionWithEmbeddedContext() async throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-apple-ask-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: tmp) }
@@ -24,25 +22,18 @@ final class AppleAskIntegrationTests: XCTestCase {
         let prompt = ClaudeDesktopPrompt.library(question: "What did we decide in Roadmap sync?")
         let enriched = AskContextBuilder.enrichForAsk(prompt, archive: archive, limits: .onDevice)
 
-        XCTAssertTrue(enriched.contains("Roadmap sync"))
-        XCTAssertTrue(enriched.contains("folders"))
+        #expect(enriched.contains("Roadmap sync"))
+        #expect(enriched.contains("folders"))
 
         let answer = try await AppleSummarizer.answer(prompt: enriched)
-        XCTAssertFalse(answer.isEmpty)
-        XCTAssertFalse(answer.lowercased().contains("i'll look"))
-        XCTAssertTrue(
-            answer.localizedCaseInsensitiveContains("folder")
+        #expect(!(answer.isEmpty))
+        #expect(!(answer.lowercased().contains("i'll look")))
+        #expect(answer.localizedCaseInsensitiveContains("folder")
                 || answer.localizedCaseInsensitiveContains("transcript")
-                || answer.localizedCaseInsensitiveContains("friday"),
-            "Expected answer to reference embedded summary, got: \(answer.prefix(200))"
-        )
+                || answer.localizedCaseInsensitiveContains("friday"), "Expected answer to reference embedded summary, got: \(answer.prefix(200))")
     }
 
-    func testOnDeviceWeekSummaryIncludesMultipleMeetings() async throws {
-        guard AppleSummarizer.isAvailable else {
-            throw XCTSkip(AppleSummarizer.unavailableReason ?? "Apple Intelligence unavailable")
-        }
-
+    @Test func testOnDeviceWeekSummaryIncludesMultipleMeetings() async throws {
         let tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-apple-week-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: tmp) }
@@ -65,12 +56,9 @@ final class AppleAskIntegrationTests: XCTestCase {
         let enriched = AskContextBuilder.enrichForAsk(prompt, archive: archive, limits: .onDevice)
         let answer = try await AppleSummarizer.answer(prompt: enriched)
 
-        XCTAssertFalse(answer.localizedCaseInsensitiveContains("meetings at"))
-        XCTAssertTrue(
-            answer.localizedCaseInsensitiveContains("folder")
+        #expect(!(answer.localizedCaseInsensitiveContains("meetings at")))
+        #expect(answer.localizedCaseInsensitiveContains("folder")
                 || answer.localizedCaseInsensitiveContains("transcript")
-                || answer.localizedCaseInsensitiveContains("MCP"),
-            "Expected substantive synthesis, got: \(answer.prefix(300))"
-        )
+                || answer.localizedCaseInsensitiveContains("MCP"), "Expected substantive synthesis, got: \(answer.prefix(300))")
     }
 }

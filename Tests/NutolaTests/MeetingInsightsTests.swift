@@ -1,22 +1,17 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class MeetingInsightsTests: XCTestCase {
+struct MeetingInsightsTests {
     // Pin a deterministic Gregorian calendar with an en locale so weekday
     // labels and week boundaries don't depend on the test host's settings.
     private var calendar: Calendar!
 
-    override func setUp() {
-        super.setUp()
+    init() {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "America/Los_Angeles")!
         cal.locale = Locale(identifier: "en_US")
         calendar = cal
-    }
-
-    override func tearDown() {
-        calendar = nil
-        super.tearDown()
     }
 
     /// Week of Monday 2026-07-13 (a Monday) → the 7-day window runs Mon–Sun.
@@ -41,7 +36,7 @@ final class MeetingInsightsTests: XCTestCase {
 
     // MARK: - totalMeetingTime
 
-    func testTotalMeetingTime() {
+    @Test func testTotalMeetingTime() {
         let meetings = [
             makeMeeting(title: "A", dayOffset: 0, durationMinutes: 60),
             makeMeeting(title: "B", dayOffset: 0, durationMinutes: 30),
@@ -50,12 +45,12 @@ final class MeetingInsightsTests: XCTestCase {
         let insights = MeetingInsightsCalculator.calculate(
             meetings: meetings, forWeekOf: weekStart, calendar: calendar)
 
-        XCTAssertEqual(insights.totalMeetingTime, 135 * 60, accuracy: 0.001)
+        #expect(abs((insights.totalMeetingTime) - (135 * 60)) <= 0.001)
     }
 
     // MARK: - meetingCount
 
-    func testMeetingCount() {
+    @Test func testMeetingCount() {
         let meetings = [
             makeMeeting(title: "A", dayOffset: 0),
             makeMeeting(title: "B", dayOffset: 1),
@@ -66,12 +61,12 @@ final class MeetingInsightsTests: XCTestCase {
         let insights = MeetingInsightsCalculator.calculate(
             meetings: meetings, forWeekOf: weekStart, calendar: calendar)
 
-        XCTAssertEqual(insights.meetingCount, 5)
+        #expect(insights.meetingCount == 5)
     }
 
     // MARK: - longestMeeting
 
-    func testLongestMeeting() {
+    @Test func testLongestMeeting() {
         let meetings = [
             makeMeeting(title: "Short", dayOffset: 0, durationMinutes: 15),
             makeMeeting(title: "Marathon", dayOffset: 2, durationMinutes: 60),
@@ -80,13 +75,13 @@ final class MeetingInsightsTests: XCTestCase {
         let insights = MeetingInsightsCalculator.calculate(
             meetings: meetings, forWeekOf: weekStart, calendar: calendar)
 
-        XCTAssertEqual(insights.longestMeetingDuration, 60 * 60, accuracy: 0.001)
-        XCTAssertEqual(insights.longestMeetingTitle, "Marathon")
+        #expect(abs((insights.longestMeetingDuration) - (60 * 60)) <= 0.001)
+        #expect(insights.longestMeetingTitle == "Marathon")
     }
 
     // MARK: - busiestDay
 
-    func testBusiestDay() {
+    @Test func testBusiestDay() {
         // Mon: 1 meeting, Wed: 3 meetings, Fri: 2 meetings.
         let meetings = [
             makeMeeting(title: "Mon A", dayOffset: 0),
@@ -99,13 +94,13 @@ final class MeetingInsightsTests: XCTestCase {
         let insights = MeetingInsightsCalculator.calculate(
             meetings: meetings, forWeekOf: weekStart, calendar: calendar)
 
-        XCTAssertEqual(insights.busiestDay, "Wed")
-        XCTAssertEqual(insights.busiestDayMeetingCount, 3)
+        #expect(insights.busiestDay == "Wed")
+        #expect(insights.busiestDayMeetingCount == 3)
     }
 
     // MARK: - avgDuration
 
-    func testAvgDuration() {
+    @Test func testAvgDuration() {
         let meetings = [
             makeMeeting(title: "A", dayOffset: 0, durationMinutes: 60),
             makeMeeting(title: "B", dayOffset: 1, durationMinutes: 30),
@@ -114,29 +109,29 @@ final class MeetingInsightsTests: XCTestCase {
         let insights = MeetingInsightsCalculator.calculate(
             meetings: meetings, forWeekOf: weekStart, calendar: calendar)
 
-        XCTAssertEqual(insights.avgMeetingDuration, 45 * 60, accuracy: 0.001)
+        #expect(abs((insights.avgMeetingDuration) - (45 * 60)) <= 0.001)
     }
 
     // MARK: - emptyWeek
 
-    func testEmptyWeek() {
+    @Test func testEmptyWeek() {
         let insights = MeetingInsightsCalculator.calculate(
             meetings: [], forWeekOf: weekStart, calendar: calendar)
 
-        XCTAssertEqual(insights.totalMeetingTime, 0)
-        XCTAssertEqual(insights.meetingCount, 0)
-        XCTAssertEqual(insights.longestMeetingDuration, 0)
-        XCTAssertEqual(insights.longestMeetingTitle, "")
-        XCTAssertEqual(insights.busiestDay, "")
-        XCTAssertEqual(insights.busiestDayMeetingCount, 0)
-        XCTAssertEqual(insights.avgMeetingDuration, 0)
-        XCTAssertEqual(insights.perDayBreakdown.count, 7)
-        XCTAssertTrue(insights.perDayBreakdown.allSatisfy { $0.count == 0 && $0.totalMinutes == 0 })
+        #expect(insights.totalMeetingTime == 0)
+        #expect(insights.meetingCount == 0)
+        #expect(insights.longestMeetingDuration == 0)
+        #expect(insights.longestMeetingTitle == "")
+        #expect(insights.busiestDay == "")
+        #expect(insights.busiestDayMeetingCount == 0)
+        #expect(insights.avgMeetingDuration == 0)
+        #expect(insights.perDayBreakdown.count == 7)
+        #expect(insights.perDayBreakdown.allSatisfy { $0.count == 0 && $0.totalMinutes == 0 })
     }
 
     // MARK: - perDayBreakdown
 
-    func testPerDayBreakdown() {
+    @Test func testPerDayBreakdown() {
         let meetings = [
             makeMeeting(title: "Mon", dayOffset: 0),
             makeMeeting(title: "Wed", dayOffset: 2),
@@ -145,23 +140,23 @@ final class MeetingInsightsTests: XCTestCase {
         let insights = MeetingInsightsCalculator.calculate(
             meetings: meetings, forWeekOf: weekStart, calendar: calendar)
 
-        XCTAssertEqual(insights.perDayBreakdown.count, 7)
+        #expect(insights.perDayBreakdown.count == 7)
         // Monday 2026-07-13 is a Monday, so the week reads Mon, Tue, Wed, Thu, Fri, Sat, Sun.
         let days = insights.perDayBreakdown.map(\.day)
-        XCTAssertEqual(days, ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
-        XCTAssertEqual(insights.perDayBreakdown[0].count, 1)
-        XCTAssertEqual(insights.perDayBreakdown[2].count, 1)
-        XCTAssertEqual(insights.perDayBreakdown[4].count, 1)
+        #expect(days == ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
+        #expect(insights.perDayBreakdown[0].count == 1)
+        #expect(insights.perDayBreakdown[2].count == 1)
+        #expect(insights.perDayBreakdown[4].count == 1)
         // The empty days still show up, just with zero meetings.
-        XCTAssertEqual(insights.perDayBreakdown[1].count, 0)
-        XCTAssertEqual(insights.perDayBreakdown[3].count, 0)
-        XCTAssertEqual(insights.perDayBreakdown[5].count, 0)
-        XCTAssertEqual(insights.perDayBreakdown[6].count, 0)
+        #expect(insights.perDayBreakdown[1].count == 0)
+        #expect(insights.perDayBreakdown[3].count == 0)
+        #expect(insights.perDayBreakdown[5].count == 0)
+        #expect(insights.perDayBreakdown[6].count == 0)
     }
 
     // MARK: - perDayBreakdown minutes
 
-    func testPerDayBreakdownMinutes() {
+    @Test func testPerDayBreakdownMinutes() {
         let meetings = [
             makeMeeting(title: "Mon", dayOffset: 0, durationMinutes: 60),
             makeMeeting(title: "Mon2", dayOffset: 0, durationMinutes: 30),
@@ -170,14 +165,14 @@ final class MeetingInsightsTests: XCTestCase {
         let insights = MeetingInsightsCalculator.calculate(
             meetings: meetings, forWeekOf: weekStart, calendar: calendar)
 
-        XCTAssertEqual(insights.perDayBreakdown[0].totalMinutes, 90)
-        XCTAssertEqual(insights.perDayBreakdown[2].totalMinutes, 45)
-        XCTAssertEqual(insights.perDayBreakdown[1].totalMinutes, 0)
+        #expect(insights.perDayBreakdown[0].totalMinutes == 90)
+        #expect(insights.perDayBreakdown[2].totalMinutes == 45)
+        #expect(insights.perDayBreakdown[1].totalMinutes == 0)
     }
 
     // MARK: - out-of-week meetings are excluded
 
-    func testOutOfWeekMeetingsExcluded() {
+    @Test func testOutOfWeekMeetingsExcluded() {
         // The day before the week starts and the day it ends are both out.
         let before = makeMeeting(title: "Before", dayOffset: -1)
         let after = makeMeeting(title: "After", dayOffset: 7)
@@ -186,14 +181,14 @@ final class MeetingInsightsTests: XCTestCase {
         let insights = MeetingInsightsCalculator.calculate(
             meetings: [before, after, inWeek], forWeekOf: weekStart, calendar: calendar)
 
-        XCTAssertEqual(insights.meetingCount, 1)
-        XCTAssertEqual(insights.totalMeetingTime, 30 * 60, accuracy: 0.001)
-        XCTAssertEqual(insights.longestMeetingTitle, "In")
+        #expect(insights.meetingCount == 1)
+        #expect(abs((insights.totalMeetingTime) - (30 * 60)) <= 0.001)
+        #expect(insights.longestMeetingTitle == "In")
     }
 
     // MARK: - longest tie-break is deterministic
 
-    func testLongestMeetingTieKeepsFirstSeen() {
+    @Test func testLongestMeetingTieKeepsFirstSeen() {
         // Two meetings with equal max duration: `max(by:)` keeps the first, so
         // the earliest one in the week wins the title.
         let meetings = [
@@ -203,7 +198,7 @@ final class MeetingInsightsTests: XCTestCase {
         let insights = MeetingInsightsCalculator.calculate(
             meetings: meetings, forWeekOf: weekStart, calendar: calendar)
 
-        XCTAssertEqual(insights.longestMeetingDuration, 60 * 60, accuracy: 0.001)
-        XCTAssertEqual(insights.longestMeetingTitle, "Later")
+        #expect(abs((insights.longestMeetingDuration) - (60 * 60)) <= 0.001)
+        #expect(insights.longestMeetingTitle == "Later")
     }
 }

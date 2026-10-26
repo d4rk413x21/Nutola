@@ -1,7 +1,8 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class SharedNotesExporterTests: XCTestCase {
+struct SharedNotesExporterTests {
     // MARK: - fixtures
 
     private func sampleMeeting() -> Meeting {
@@ -34,102 +35,102 @@ final class SharedNotesExporterTests: XCTestCase {
 
     // MARK: - exportHTML
 
-    func testExportHTMLContainsTitle() {
+    @Test func testExportHTMLContainsTitle() {
         let html = SharedNotesExporter.exportHTML(
             meeting: sampleMeeting(),
             summary: sampleSummary(),
             transcript: sampleTranscript(),
             actionItems: sampleActionItems())
-        XCTAssertTrue(html.contains("<title>Sprint Planning</title>"))
-        XCTAssertTrue(html.contains("<h1>Sprint Planning</h1>"))
+        #expect(html.contains("<title>Sprint Planning</title>"))
+        #expect(html.contains("<h1>Sprint Planning</h1>"))
     }
 
-    func testExportHTMLContainsSummary() {
+    @Test func testExportHTMLContainsSummary() {
         let html = SharedNotesExporter.exportHTML(
             meeting: sampleMeeting(),
             summary: sampleSummary(),
             transcript: sampleTranscript(),
             actionItems: sampleActionItems())
-        XCTAssertTrue(html.contains("We aligned on the Q3 scope."))
-        XCTAssertTrue(html.contains("TL;DR"))
+        #expect(html.contains("We aligned on the Q3 scope."))
+        #expect(html.contains("TL;DR"))
     }
 
-    func testExportHTMLContainsTranscript() {
+    @Test func testExportHTMLContainsTranscript() {
         let html = SharedNotesExporter.exportHTML(
             meeting: sampleMeeting(),
             summary: sampleSummary(),
             transcript: sampleTranscript(),
             actionItems: sampleActionItems())
-        XCTAssertTrue(html.contains("<span class=\"speaker\">Me</span>"))
-        XCTAssertTrue(html.contains("<span class=\"speaker\">Alice</span>"))
-        XCTAssertTrue(html.contains("Welcome everyone."))
-        XCTAssertTrue(html.contains("Thanks for hosting."))
+        #expect(html.contains("<span class=\"speaker\">Me</span>"))
+        #expect(html.contains("<span class=\"speaker\">Alice</span>"))
+        #expect(html.contains("Welcome everyone."))
+        #expect(html.contains("Thanks for hosting."))
         // Timestamps from the turn starts.
-        XCTAssertTrue(html.contains("0:00"))
-        XCTAssertTrue(html.contains("1:05"))
+        #expect(html.contains("0:00"))
+        #expect(html.contains("1:05"))
     }
 
-    func testExportHTMLContainsActionItems() {
+    @Test func testExportHTMLContainsActionItems() {
         let html = SharedNotesExporter.exportHTML(
             meeting: sampleMeeting(),
             summary: sampleSummary(),
             transcript: sampleTranscript(),
             actionItems: sampleActionItems())
-        XCTAssertTrue(html.contains("Send the recap"))
-        XCTAssertTrue(html.contains("File the ticket"))
-        XCTAssertTrue(html.contains("Action items"))
+        #expect(html.contains("Send the recap"))
+        #expect(html.contains("File the ticket"))
+        #expect(html.contains("Action items"))
         // Owner rendered inline.
-        XCTAssertTrue(html.contains("Alice"))
+        #expect(html.contains("Alice"))
     }
 
-    func testExportHTMLIsSelfContained() {
+    @Test func testExportHTMLIsSelfContained() {
         let html = SharedNotesExporter.exportHTML(
             meeting: sampleMeeting(),
             summary: sampleSummary(),
             transcript: sampleTranscript(),
             actionItems: sampleActionItems())
-        XCTAssertFalse(html.contains("<link"))
-        XCTAssertFalse(html.contains("<script src="))
-        XCTAssertFalse(html.contains("<script"))
+        #expect(!(html.contains("<link")))
+        #expect(!(html.contains("<script src=")))
+        #expect(!(html.contains("<script")))
     }
 
-    func testExportHTMLHasDarkTheme() {
+    @Test func testExportHTMLHasDarkTheme() {
         let html = SharedNotesExporter.exportHTML(
             meeting: sampleMeeting(),
             summary: sampleSummary(),
             transcript: sampleTranscript(),
             actionItems: sampleActionItems())
-        XCTAssertTrue(html.contains("background"))
-        XCTAssertTrue(html.contains("#1") || html.contains("#2") || html.contains("#14"))
+        #expect(html.contains("background"))
+        #expect(html.contains("#1") || html.contains("#2") || html.contains("#14"))
     }
 
-    func testExportToFileReturnsURL() throws {
+    @Test func testExportToFileReturnsURL() throws {
         let url = try SharedNotesExporter.exportToFile(
             meeting: sampleMeeting(),
             summary: sampleSummary(),
             transcript: sampleTranscript(),
             actionItems: sampleActionItems())
-        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        #expect(FileManager.default.fileExists(atPath: url.path))
         let data = try Data(contentsOf: url)
         let html = String(data: data, encoding: .utf8) ?? ""
-        XCTAssertTrue(html.contains("<title>Sprint Planning</title>"))
+        #expect(html.contains("<title>Sprint Planning</title>"))
         try? FileManager.default.removeItem(at: url)
     }
 
-    func testExportHTMLWithEmptyData() {
+    @Test func testExportHTMLWithEmptyData() {
         let m = Meeting(title: "Empty", createdAt: Date())
         let html = SharedNotesExporter.exportHTML(
             meeting: m,
             summary: "",
             transcript: [],
             actionItems: [])
-        XCTAssertTrue(html.contains("<!doctype html>"))
-        XCTAssertTrue(html.contains("<title>Empty</title>"))
-        XCTAssertTrue(html.contains("<html"))
-        XCTAssertTrue(html.contains("</html>"))
+        #expect(html.contains("<!doctype html>"))
+        #expect(html.contains("<title>Empty</title>"))
+        #expect(html.contains("<html"))
+        #expect(html.contains("</html>"))
         // Empty sections are simply omitted — still a valid page.
-        XCTAssertFalse(html.contains("Summary"))
-        XCTAssertFalse(html.contains("Transcript"))
-        XCTAssertFalse(html.contains("Action items"))
+        #expect(!(html.contains("Summary")))
+        #expect(!(html.contains("Transcript")))
+        #expect(!(html.contains("Action items")))
     }
 }

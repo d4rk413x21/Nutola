@@ -1,87 +1,88 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class HTMLExporterTests: XCTestCase {
+struct HTMLExporterTests {
     // MARK: - renderMarkdown
 
-    func testHeadings() {
+    @Test func testHeadings() {
         let html = HTMLExporter.renderMarkdown("# One\n## Two\n### Three")
-        XCTAssertTrue(html.contains("<h1>One</h1>"))
-        XCTAssertTrue(html.contains("<h2>Two</h2>"))
-        XCTAssertTrue(html.contains("<h3>Three</h3>"))
+        #expect(html.contains("<h1>One</h1>"))
+        #expect(html.contains("<h2>Two</h2>"))
+        #expect(html.contains("<h3>Three</h3>"))
     }
 
-    func testParagraphsSeparatedByBlankLines() {
+    @Test func testParagraphsSeparatedByBlankLines() {
         let html = HTMLExporter.renderMarkdown("First line\nstill first.\n\nSecond.")
-        XCTAssertTrue(html.contains("<p>First line still first.</p>"))
-        XCTAssertTrue(html.contains("<p>Second.</p>"))
+        #expect(html.contains("<p>First line still first.</p>"))
+        #expect(html.contains("<p>Second.</p>"))
     }
 
-    func testBoldAndItalic() {
+    @Test func testBoldAndItalic() {
         let html = HTMLExporter.renderMarkdown("Ship **now** and *fast*.")
-        XCTAssertTrue(html.contains("<strong>now</strong>"))
-        XCTAssertTrue(html.contains("<em>fast</em>"))
-        XCTAssertFalse(html.contains("*"))
+        #expect(html.contains("<strong>now</strong>"))
+        #expect(html.contains("<em>fast</em>"))
+        #expect(!(html.contains("*")))
     }
 
-    func testSpacedAsterisksNotItalic() {
+    @Test func testSpacedAsterisksNotItalic() {
         // CommonMark: * text * (whitespace-flanking) is not emphasis.
         let html = HTMLExporter.renderMarkdown("The ratio was * 3 * and that was fine.")
-        XCTAssertFalse(html.contains("<em>"))
-        XCTAssertTrue(html.contains("* 3 *"))
+        #expect(!(html.contains("<em>")))
+        #expect(html.contains("* 3 *"))
     }
 
-    func testSpacedAsterisksNotBold() {
+    @Test func testSpacedAsterisksNotBold() {
         // CommonMark: ** text ** (whitespace-flanking) is not bold.
         let html = HTMLExporter.renderMarkdown("It was ** not important ** so we skipped it.")
-        XCTAssertFalse(html.contains("<strong>"))
+        #expect(!(html.contains("<strong>")))
     }
 
-    func testSingleCharEmphasis() {
+    @Test func testSingleCharEmphasis() {
         // Single-character emphasis like *a* should still render as italic.
         let html = HTMLExporter.renderMarkdown("This is *a* test.")
-        XCTAssertTrue(html.contains("<em>a</em>"))
+        #expect(html.contains("<em>a</em>"))
     }
 
-    func testBullets() {
+    @Test func testBullets() {
         let html = HTMLExporter.renderMarkdown("- one\n- two\n\nafter")
-        XCTAssertTrue(html.contains("<ul>"))
-        XCTAssertTrue(html.contains("<li>one</li>"))
-        XCTAssertTrue(html.contains("<li>two</li>"))
-        XCTAssertTrue(html.contains("</ul>"))
-        XCTAssertTrue(html.contains("<p>after</p>"))
+        #expect(html.contains("<ul>"))
+        #expect(html.contains("<li>one</li>"))
+        #expect(html.contains("<li>two</li>"))
+        #expect(html.contains("</ul>"))
+        #expect(html.contains("<p>after</p>"))
     }
 
-    func testCheckboxes() {
+    @Test func testCheckboxes() {
         let html = HTMLExporter.renderMarkdown("- [ ] open item\n- [x] done item")
-        XCTAssertTrue(html.contains("<li class=\"task\"><input type=\"checkbox\" disabled> open item</li>"))
-        XCTAssertTrue(html.contains("<li class=\"task\"><input type=\"checkbox\" disabled checked> done item</li>"))
+        #expect(html.contains("<li class=\"task\"><input type=\"checkbox\" disabled> open item</li>"))
+        #expect(html.contains("<li class=\"task\"><input type=\"checkbox\" disabled checked> done item</li>"))
     }
 
-    func testUnknownLinesBecomeParagraphs() {
+    @Test func testUnknownLinesBecomeParagraphs() {
         let html = HTMLExporter.renderMarkdown("> not a supported quote")
-        XCTAssertTrue(html.contains("<p>&gt; not a supported quote</p>"))
+        #expect(html.contains("<p>&gt; not a supported quote</p>"))
     }
 
-    func testHorizontalRule() {
+    @Test func testHorizontalRule() {
         let html = HTMLExporter.renderMarkdown("Before\n\n---\n\nAfter")
-        XCTAssertTrue(html.contains("<hr>"))
-        XCTAssertFalse(html.contains("---"))
-        XCTAssertTrue(html.contains("<p>Before</p>"))
-        XCTAssertTrue(html.contains("<p>After</p>"))
+        #expect(html.contains("<hr>"))
+        #expect(!(html.contains("---")))
+        #expect(html.contains("<p>Before</p>"))
+        #expect(html.contains("<p>After</p>"))
     }
 
     // MARK: - escape
 
-    func testEscapeNeutralizesScriptTag() {
+    @Test func testEscapeNeutralizesScriptTag() {
         let out = HTMLExporter.escape("<script>alert('x & y')</script>")
-        XCTAssertFalse(out.contains("<script>"))
-        XCTAssertEqual(out, "&lt;script&gt;alert(&#39;x &amp; y&#39;)&lt;/script&gt;")
+        #expect(!(out.contains("<script>")))
+        #expect(out == "&lt;script&gt;alert(&#39;x &amp; y&#39;)&lt;/script&gt;")
     }
 
     // MARK: - html
 
-    func testHTMLDocument() {
+    @Test func testHTMLDocument() {
         var m = Meeting(title: "Design Sync <Q3>", createdAt: Date(timeIntervalSince1970: 1_750_000_000))
         m.duration = 30 * 60
         m.attendees = ["Alice", "Bob"]
@@ -100,41 +101,42 @@ final class HTMLExporterTests: XCTestCase {
             segments: segments)
 
         // title (escaped) in <title> and header; raw user markup never survives
-        XCTAssertTrue(html.contains("<title>Design Sync &lt;Q3&gt;</title>"))
-        XCTAssertTrue(html.contains("<h1>Design Sync &lt;Q3&gt;</h1>"))
-        XCTAssertFalse(html.contains("<Q3>"))
+        #expect(html.contains("<title>Design Sync &lt;Q3&gt;</title>"))
+        #expect(html.contains("<h1>Design Sync &lt;Q3&gt;</h1>"))
+        #expect(!(html.contains("<Q3>")))
 
         // speaker names and attendee chips
-        XCTAssertTrue(html.contains("<span class=\"speaker\">Me</span>"))
-        XCTAssertTrue(html.contains("<span class=\"speaker\">Alice</span>"))
-        XCTAssertTrue(html.contains("<span class=\"chip\">Bob</span>"))
+        #expect(html.contains("<span class=\"speaker\">Me</span>"))
+        #expect(html.contains("<span class=\"speaker\">Alice</span>"))
+        #expect(html.contains("<span class=\"chip\">Bob</span>"))
 
         // timestamps, with consecutive same-speaker segments merged into one turn
-        XCTAssertTrue(html.contains("0:00"))
-        XCTAssertTrue(html.contains("1:05"))
-        XCTAssertTrue(html.contains("<p>Hi &lt;everyone&gt;. Let&#39;s begin.</p>"))
+        #expect(html.contains("0:00"))
+        #expect(html.contains("1:05"))
+        #expect(html.contains("<p>Hi &lt;everyone&gt;. Let&#39;s begin.</p>"))
 
         // template placeholders were filled — none leak into the page
-        XCTAssertFalse(html.contains("{{"))
-        XCTAssertTrue(html.contains("30 min"))
+        #expect(!(html.contains("{{")))
+        #expect(html.contains("30 min"))
     }
 
-    func testGeneratorMetaPresentOnceBeforeTitle() {
+    @Test func testGeneratorMetaPresentOnceBeforeTitle() {
         let m = Meeting(title: "Solo", createdAt: Date())
         let html = HTMLExporter.html(meeting: m, summaryMarkdown: "", segments: [])
         let marker = "<meta name=\"generator\" content=\"nutola/1\">"
-        XCTAssertEqual(html.components(separatedBy: marker).count - 1, 1)
+        #expect(html.components(separatedBy: marker).count - 1 == 1)
         guard let markerRange = html.range(of: marker), let titleRange = html.range(of: "<title>") else {
-            return XCTFail("expected both generator meta and <title> in output")
+            Issue.record("expected both generator meta and <title> in output")
+            return
         }
-        XCTAssertTrue(markerRange.upperBound <= titleRange.lowerBound)
+        #expect(markerRange.upperBound <= titleRange.lowerBound)
     }
 
-    func testHTMLOmitsEmptySections() {
+    @Test func testHTMLOmitsEmptySections() {
         let m = Meeting(title: "Solo", createdAt: Date())
         let html = HTMLExporter.html(meeting: m, summaryMarkdown: "", segments: [])
-        XCTAssertFalse(html.contains("Transcript"))
-        XCTAssertFalse(html.contains("Summary"))
-        XCTAssertTrue(html.contains("Recorded with"))
+        #expect(!(html.contains("Transcript")))
+        #expect(!(html.contains("Summary")))
+        #expect(html.contains("Recorded with"))
     }
 }

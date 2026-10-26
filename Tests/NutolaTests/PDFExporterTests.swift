@@ -1,8 +1,9 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class PDFExporterTests: XCTestCase {
-    func testExportProducesNonEmptyPDF() throws {
+struct PDFExporterTests {
+    @Test func testExportProducesNonEmptyPDF() throws {
         let meeting = Meeting(
             title: "Test Meeting",
             createdAt: Date(timeIntervalSince1970: 1_700_000_000),
@@ -35,12 +36,12 @@ final class PDFExporterTests: XCTestCase {
             segments: segments,
             to: dest)
 
-        XCTAssertTrue(FileManager.default.fileExists(atPath: dest.path), "PDF should exist at \(dest.path)")
+        #expect(FileManager.default.fileExists(atPath: dest.path), "PDF should exist at \(dest.path)")
         let attrs = try FileManager.default.attributesOfItem(atPath: dest.path)
         let size = attrs[.size] as? Int ?? 0
-        XCTAssertGreaterThan(size, 100, "PDF should not be empty")
+        #expect(size > 100, "PDF should not be empty")
         // PDF magic bytes
         let data = try Data(contentsOf: dest)
-        XCTAssertEqual(data.prefix(4), Data("%PDF".utf8), "File should start with %PDF")
+        #expect(data.prefix(4) == Data("%PDF".utf8), "File should start with %PDF")
     }
 }

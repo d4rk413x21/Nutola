@@ -1,7 +1,8 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class CSVExporterTests: XCTestCase {
+struct CSVExporterTests {
     // MARK: - Helpers
 
     private func makeMeeting(
@@ -69,14 +70,14 @@ final class CSVExporterTests: XCTestCase {
 
     // MARK: - Header
 
-    func testHeaderIsFirstLine() {
+    @Test func testHeaderIsFirstLine() {
         let csv = CSVExporter.export(meetings: [])
-        XCTAssertEqual(csv, CSVExporter.header)
+        #expect(csv == CSVExporter.header)
     }
 
     // MARK: - Basic export
 
-    func testBasicExport() {
+    @Test func testBasicExport() {
         let meeting = makeMeeting(
             title: "Design Sync",
             duration: 12 * 60,
@@ -90,21 +91,21 @@ final class CSVExporterTests: XCTestCase {
         let csv = CSVExporter.export(meetings: [meeting])
 
         let lines = rows(csv)
-        XCTAssertEqual(lines.count, 2)
-        XCTAssertEqual(lines[0], CSVExporter.header)
+        #expect(lines.count == 2)
+        #expect(lines[0] == CSVExporter.header)
         let fields = csvFields(lines[1])
-        XCTAssertEqual(fields.count, 8)
-        XCTAssertEqual(fields[0], "Design Sync")
-        XCTAssertEqual(fields[3], "ready")
-        XCTAssertEqual(fields[4], "zoom.us")
-        XCTAssertEqual(fields[5], "Me; Alice")
-        XCTAssertEqual(fields[6], "Yes")
-        XCTAssertEqual(fields[7], "Yes")
+        #expect(fields.count == 8)
+        #expect(fields[0] == "Design Sync")
+        #expect(fields[3] == "ready")
+        #expect(fields[4] == "zoom.us")
+        #expect(fields[5] == "Me; Alice")
+        #expect(fields[6] == "Yes")
+        #expect(fields[7] == "Yes")
     }
 
     // MARK: - Multiple meetings
 
-    func testMultipleMeetings() {
+    @Test func testMultipleMeetings() {
         let meetings = [
             makeMeeting(title: "Standup A", duration: 15 * 60),
             makeMeeting(title: "Standup B", duration: 30 * 60),
@@ -114,70 +115,70 @@ final class CSVExporterTests: XCTestCase {
 
         let lines = rows(csv)
         // Header + 3 rows, nothing trailing.
-        XCTAssertEqual(lines.count, 4)
-        XCTAssertEqual(lines[0], CSVExporter.header)
-        XCTAssertEqual(csvFields(lines[1])[0], "Standup A")
-        XCTAssertEqual(csvFields(lines[2])[0], "Standup B")
-        XCTAssertEqual(csvFields(lines[3])[0], "Standup C")
+        #expect(lines.count == 4)
+        #expect(lines[0] == CSVExporter.header)
+        #expect(csvFields(lines[1])[0] == "Standup A")
+        #expect(csvFields(lines[2])[0] == "Standup B")
+        #expect(csvFields(lines[3])[0] == "Standup C")
     }
 
     // MARK: - CSV escaping
 
-    func testCSVEscaping() {
+    @Test func testCSVEscaping() {
         let meeting = makeMeeting(
             title: "Q3 \"Roadmap\", Planning",
             speakers: [Speaker(id: "me", name: "Me, Jr.", isMe: true)])
         let csv = CSVExporter.export(meetings: [meeting])
 
         let lines = rows(csv)
-        XCTAssertEqual(lines.count, 2)
+        #expect(lines.count == 2)
         let fields = csvFields(lines[1])
         // Title with comma and quotes is wrapped and embedded quotes doubled.
-        XCTAssertEqual(fields[0], "Q3 \"Roadmap\", Planning")
+        #expect(fields[0] == "Q3 \"Roadmap\", Planning")
         // Speaker name with a comma is also escaped.
-        XCTAssertEqual(fields[5], "Me, Jr.")
+        #expect(fields[5] == "Me, Jr.")
     }
 
-    func testFieldWithNewlineIsQuoted() {
+    @Test func testFieldWithNewlineIsQuoted() {
         let meeting = makeMeeting(title: "Line one\nLine two")
         let csv = CSVExporter.export(meetings: [meeting])
         // The record stays one logical row; the embedded newline lives inside quotes.
-        XCTAssertTrue(csv.contains("\"Line one\nLine two\""))
+        #expect(csv.contains("\"Line one\nLine two\""))
         // And it round-trips through the field parser.
         let lines = rows(csv)
-        XCTAssertEqual(lines.count, 2)
-        XCTAssertEqual(csvFields(lines[1])[0], "Line one\nLine two")
+        #expect(lines.count == 2)
+        #expect(csvFields(lines[1])[0] == "Line one\nLine two")
     }
 
     // MARK: - Empty meetings
 
-    func testEmptyMeetings() {
+    @Test func testEmptyMeetings() {
         let csv = CSVExporter.export(meetings: [])
-        XCTAssertEqual(csv, CSVExporter.header)
+        #expect(csv == CSVExporter.header)
         // No trailing line break.
-        XCTAssertFalse(csv.hasSuffix("\r\n"))
+        #expect(!(csv.hasSuffix("\r\n")))
     }
 
     // MARK: - Duration formatting
 
-    func testDurationFormatting() {
-        XCTAssertEqual(CSVExporter.duration(0), "0m")
-        XCTAssertEqual(CSVExporter.duration(45), "1m")
-        XCTAssertEqual(CSVExporter.duration(12 * 60), "12m")
-        XCTAssertEqual(CSVExporter.duration(65 * 60), "1h 5m")
-        XCTAssertEqual(CSVExporter.duration(125 * 60), "2h 5m")
-        XCTAssertEqual(CSVExporter.duration(60 * 60), "1h 0m")
+    @Test func testDurationFormatting() {
+        #expect(CSVExporter.duration(0) == "0m")
+        #expect(CSVExporter.duration(45) == "1m")
+        #expect(CSVExporter.duration(12 * 60) == "12m")
+        #expect(CSVExporter.duration(65 * 60) == "1h 5m")
+        #expect(CSVExporter.duration(125 * 60) == "2h 5m")
+        #expect(CSVExporter.duration(60 * 60) == "1h 0m")
     }
 
-    func testDurationInExportedRow() {
+    @Test func testDurationInExportedRow() {
         let meeting = makeMeeting(title: "Sync", duration: 65 * 60)
         let csv = CSVExporter.export(meetings: [meeting])
-        XCTAssertTrue(csv.contains(",1h 5m,"))
+        #expect(csv.contains(",1h 5m,"))
     }
 
     // MARK: - Speakers formatting
 
-    func testSpeakersFormatting() {
+    @Test func testSpeakersFormatting() {
         let speakers = [
             Speaker(id: "me", name: "Me", isMe: true),
             Speaker(id: "s1", name: "Alice"),
@@ -187,46 +188,45 @@ final class CSVExporterTests: XCTestCase {
         let csv = CSVExporter.export(meetings: [meeting])
 
         let lines = rows(csv)
-        XCTAssertEqual(csvFields(lines[1])[5], "Me; Alice; Bob")
+        #expect(csvFields(lines[1])[5] == "Me; Alice; Bob")
     }
 
-    func testNoSpeakers() {
+    @Test func testNoSpeakers() {
         let meeting = makeMeeting(title: "Solo", speakers: [])
         let csv = CSVExporter.export(meetings: [meeting])
 
         let lines = rows(csv)
         let fields = csvFields(lines[1])
-        XCTAssertEqual(fields[5], "")
+        #expect(fields[5] == "")
         // No speakers → no transcript signal either.
-        XCTAssertEqual(fields[7], "No")
+        #expect(fields[7] == "No")
     }
 
     // MARK: - State and summary flags
 
-    func testStateRawValue() {
+    @Test func testStateRawValue() {
         for state in [MeetingState.prep, .recording, .processing, .ready, .failed] {
             let meeting = makeMeeting(title: "M", state: state)
             let csv = CSVExporter.export(meetings: [meeting])
             let row = rows(csv)[1]
-            XCTAssertTrue(row.contains(",\(state.rawValue),"),
-                         "expected raw state \(state.rawValue) in row: \(row)")
+            #expect(row.contains(",\(state.rawValue),"), "expected raw state \(state.rawValue) in row: \(row)")
         }
     }
 
-    func testHasSummaryFlags() {
+    @Test func testHasSummaryFlags() {
         let withSummary = makeMeeting(title: "Has", speakers: [Speaker(id: "me", name: "Me", isMe: true)], summaryProvider: "claude")
         let withoutSummary = makeMeeting(title: "Missing", speakers: [Speaker(id: "me", name: "Me", isMe: true)], summaryProvider: nil)
 
         let csv = CSVExporter.export(meetings: [withSummary, withoutSummary])
         let lines = rows(csv)
-        XCTAssertEqual(csvFields(lines[1])[6], "Yes")
-        XCTAssertEqual(csvFields(lines[2])[6], "No")
+        #expect(csvFields(lines[1])[6] == "Yes")
+        #expect(csvFields(lines[2])[6] == "No")
     }
 
-    func testSourceAppEmptyWhenNil() {
+    @Test func testSourceAppEmptyWhenNil() {
         let meeting = makeMeeting(title: "M", sourceApp: nil)
         let csv = CSVExporter.export(meetings: [meeting])
         let row = rows(csv)[1]
-        XCTAssertEqual(csvFields(row)[4], "")
+        #expect(csvFields(row)[4] == "")
     }
 }

@@ -38,7 +38,7 @@ jobs:
           restore-keys: spm-v3-${{ runner.os }}-${{ runner.arch }}-xcode27.1-debug-${{ hashFiles('Package.swift', 'Package.resolved') }}-
       - run: swift --version && xcodebuild -version
       - name: Build and test
-        run: swift test
+        run: swift test --disable-xctest
       - name: Save SwiftPM cache
         if: ${{ always() && !cancelled() && steps.spm-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v6

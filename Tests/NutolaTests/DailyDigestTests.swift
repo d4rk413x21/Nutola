@@ -1,14 +1,14 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class DailyDigestTests: XCTestCase {
+struct DailyDigestTests {
     private var calendar: Calendar!
     private var now: Date!
     private var yesterdayStart: Date!
     private var generator: DailyDigestGenerator!
 
-    override func setUp() {
-        super.setUp()
+    init() {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(secondsFromGMT: 0)!
         calendar = cal
@@ -36,22 +36,22 @@ final class DailyDigestTests: XCTestCase {
         )
     }
 
-    func testGenerateWithMeetings() {
+    @Test func testGenerateWithMeetings() {
         let m1 = makeMeeting(title: "Standup", createdAt: yesterdayStart.addingTimeInterval(9 * 3600))
         let m2 = makeMeeting(title: "Retro", createdAt: yesterdayStart.addingTimeInterval(14 * 3600))
         let digest = generator.generate(for: now, meetings: [m1, m2], agenda: [])
 
-        XCTAssertEqual(digest.yesterdayMeetings.count, 2)
-        XCTAssertEqual(digest.yesterdayMeetings.map(\.title), ["Standup", "Retro"])
+        #expect(digest.yesterdayMeetings.count == 2)
+        #expect(digest.yesterdayMeetings.map(\.title) == ["Standup", "Retro"])
     }
 
-    func testGenerateWithNoMeetings() {
+    @Test func testGenerateWithNoMeetings() {
         let digest = generator.generate(for: now, meetings: [], agenda: [])
-        XCTAssertTrue(digest.yesterdayMeetings.isEmpty)
-        XCTAssertTrue(digest.summary.contains("No meetings yesterday"))
+        #expect(digest.yesterdayMeetings.isEmpty)
+        #expect(digest.summary.contains("No meetings yesterday"))
     }
 
-    func testActionItemsExtracted() {
+    @Test func testActionItemsExtracted() {
         let m = makeMeeting(title: "Planning", createdAt: yesterdayStart.addingTimeInterval(10 * 3600))
         let summaries: [UUID: String] = [
             m.id: """
@@ -62,24 +62,24 @@ final class DailyDigestTests: XCTestCase {
         ]
         let digest = generator.generate(for: now, meetings: [m], agenda: [], summaries: summaries)
 
-        XCTAssertEqual(digest.actionItems.count, 2)
-        XCTAssertEqual(digest.actionItems[0].text, "Send the proposal")
-        XCTAssertEqual(digest.actionItems[0].owner, "Alice")
-        XCTAssertEqual(digest.actionItems[1].text, "Review the code")
-        XCTAssertTrue(digest.summary.contains("📌 Action Items Due:"))
+        #expect(digest.actionItems.count == 2)
+        #expect(digest.actionItems[0].text == "Send the proposal")
+        #expect(digest.actionItems[0].owner == "Alice")
+        #expect(digest.actionItems[1].text == "Review the code")
+        #expect(digest.summary.contains("📌 Action Items Due:"))
     }
 
-    func testTodayAgendaIncluded() {
+    @Test func testTodayAgendaIncluded() {
         let e1 = makeEvent(id: "s1", title: "Standup", hour: 10)
         let e2 = makeEvent(id: "s2", title: "Review", hour: 14)
         let digest = generator.generate(for: now, meetings: [], agenda: [e1, e2])
 
-        XCTAssertTrue(digest.summary.contains("📅 Today's Agenda:"))
-        XCTAssertTrue(digest.summary.contains("- 10:00 Standup"))
-        XCTAssertTrue(digest.summary.contains("- 14:00 Review"))
+        #expect(digest.summary.contains("📅 Today's Agenda:"))
+        #expect(digest.summary.contains("- 10:00 Standup"))
+        #expect(digest.summary.contains("- 14:00 Review"))
     }
 
-    func testFormatDigestNonEmpty() {
+    @Test func testFormatDigestNonEmpty() {
         let m = makeMeeting(title: "Sync", createdAt: yesterdayStart.addingTimeInterval(11 * 3600))
         let summaries: [UUID: String] = [m.id: "- [ ] Follow up with team"]
         let digest = generator.generate(
@@ -89,12 +89,12 @@ final class DailyDigestTests: XCTestCase {
             summaries: summaries)
         let formatted = generator.formatDigest(digest)
 
-        XCTAssertFalse(formatted.isEmpty)
-        XCTAssertTrue(formatted.contains("📋 Yesterday's Digest (1 meetings)"))
-        XCTAssertTrue(formatted.contains("Sync — 1 action items"))
+        #expect(!(formatted.isEmpty))
+        #expect(formatted.contains("📋 Yesterday's Digest (1 meetings)"))
+        #expect(formatted.contains("Sync — 1 action items"))
     }
 
-    func testOnlyYesterdayMeetings() {
+    @Test func testOnlyYesterdayMeetings() {
         // Two days ago
         let twoDaysAgoStart = calendar.date(byAdding: .day, value: -2, to: calendar.startOfDay(for: now))!
         let old = makeMeeting(title: "Ancient", createdAt: twoDaysAgoStart.addingTimeInterval(9 * 3600))
@@ -104,9 +104,9 @@ final class DailyDigestTests: XCTestCase {
         let today = makeMeeting(title: "Today", createdAt: now.addingTimeInterval(-1 * 3600))
 
         let digest = generator.generate(for: now, meetings: [old, yesterday, today], agenda: [])
-        XCTAssertEqual(digest.yesterdayMeetings.count, 1)
-        XCTAssertEqual(digest.yesterdayMeetings.first?.title, "Yesterday")
-        XCTAssertFalse(digest.summary.contains("Ancient"))
-        XCTAssertFalse(digest.summary.contains("Today"))
+        #expect(digest.yesterdayMeetings.count == 1)
+        #expect(digest.yesterdayMeetings.first?.title == "Yesterday")
+        #expect(!(digest.summary.contains("Ancient")))
+        #expect(!(digest.summary.contains("Today")))
     }
 }

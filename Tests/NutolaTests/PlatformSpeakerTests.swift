@@ -1,52 +1,39 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class PlatformSpeakerTests: XCTestCase {
-    func testParseSpeakingLabels() {
-        XCTAssertEqual(
-            ZoomActiveSpeakerReader.parseSpeakingLabel("Jimmy Veloso, unmuted"),
-            "Jimmy Veloso")
-        XCTAssertEqual(
-            ZoomActiveSpeakerReader.parseZoomParticipantDescription(
-                "Gui Lima, Computer audio unmuted, Video on"),
-            "Gui Lima")
-        XCTAssertEqual(
-            ZoomActiveSpeakerReader.parseSpeakingLabel("Acquila Santos Rocha is speaking"),
-            "Acquila Santos Rocha")
-        XCTAssertEqual(
-            ZoomActiveSpeakerReader.parseSpeakingLabel("Speaking: Gui Lima"),
-            "Gui Lima")
-        XCTAssertEqual(
-            ZoomActiveSpeakerReader.parseZoomTileDescription(
-                "Paulo Henrique Paulin, Computer audio unmuted, Video on, active speaker"),
-            "Paulo Henrique Paulin")
-        XCTAssertEqual(
-            ZoomActiveSpeakerReader.parseZoomTileDescription(
-                "Gui Lima, Computer audio unmuted, Video on"),
-            nil)
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("Mute"))
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("Participants"))
+struct PlatformSpeakerTests {
+    @Test func testParseSpeakingLabels() {
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Jimmy Veloso, unmuted") == "Jimmy Veloso")
+        #expect(ZoomActiveSpeakerReader.parseZoomParticipantDescription(
+                "Gui Lima, Computer audio unmuted, Video on") == "Gui Lima")
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Acquila Santos Rocha is speaking") == "Acquila Santos Rocha")
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Speaking: Gui Lima") == "Gui Lima")
+        #expect(ZoomActiveSpeakerReader.parseZoomTileDescription(
+                "Paulo Henrique Paulin, Computer audio unmuted, Video on, active speaker") == "Paulo Henrique Paulin")
+        #expect(ZoomActiveSpeakerReader.parseZoomTileDescription(
+                "Gui Lima, Computer audio unmuted, Video on") == nil)
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Mute") == nil)
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Participants") == nil)
         // Regression: unmuted gallery tiles are roster metadata, not speaking labels.
-        XCTAssertNil(
-            ZoomActiveSpeakerReader.parseSpeakingLabel(
-                "Gui Lima, Computer audio unmuted, Video on"))
-        XCTAssertNil(
-            ZoomActiveSpeakerReader.parseSpeakingLabel(
-                "Acquila Santos Rocha, Computer audio unmuted, Video on"))
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel(
+                "Gui Lima, Computer audio unmuted, Video on") == nil)
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel(
+                "Acquila Santos Rocha, Computer audio unmuted, Video on") == nil)
     }
 
-    func testIsLocalParticipantFilteredFromActive() {
+    @Test func testIsLocalParticipantFilteredFromActive() {
         let full = NSFullUserName()
         guard !full.isEmpty else { return }
-        XCTAssertTrue(ZoomActiveSpeakerReader.isLocalParticipant(full))
+        #expect(ZoomActiveSpeakerReader.isLocalParticipant(full))
         let first = full.split(separator: " ").prefix(2).joined(separator: " ")
         if first != full {
-            XCTAssertTrue(ZoomActiveSpeakerReader.isLocalParticipant(first))
+            #expect(ZoomActiveSpeakerReader.isLocalParticipant(first))
         }
-        XCTAssertFalse(ZoomActiveSpeakerReader.isLocalParticipant("Totally Different Person"))
+        #expect(!(ZoomActiveSpeakerReader.isLocalParticipant("Totally Different Person")))
     }
 
-    func testActiveSpeakerIgnoresUnmutedGalleryTiles() {
+    @Test func testActiveSpeakerIgnoresUnmutedGalleryTiles() {
         let tiles = [
             "Acquila Santos Rocha, Computer audio unmuted, Video on",
             "Gui Lima, Computer audio unmuted, Video on",
@@ -55,11 +42,11 @@ final class PlatformSpeakerTests: XCTestCase {
         ]
         let roster = tiles.compactMap { ZoomActiveSpeakerReader.parseZoomParticipantDescription($0) }
         let active = tiles.compactMap { ZoomActiveSpeakerReader.parseZoomTileDescription($0) }
-        XCTAssertEqual(roster.count, 4)
-        XCTAssertEqual(active, ["Victor Moura de Britto"])
+        #expect(roster.count == 4)
+        #expect(active == ["Victor Moura de Britto"])
     }
 
-    func testActiveSpeakerNamesFromZoomTileDescriptions() {
+    @Test func testActiveSpeakerNamesFromZoomTileDescriptions() {
         // Regression: Zoom Workplace exposes active speaker on AXTabGroup descriptions.
         let samples = [
             "Taylor Morgan, Computer audio unmuted, Video on",
@@ -67,24 +54,24 @@ final class PlatformSpeakerTests: XCTestCase {
             "Paulo Henrique Paulin, Computer audio unmuted, Video on, active speaker",
         ]
         let names = samples.compactMap { ZoomActiveSpeakerReader.parseZoomTileDescription($0) }
-        XCTAssertEqual(names, ["Paulo Henrique Paulin"])
+        #expect(names == ["Paulo Henrique Paulin"])
     }
 
-    func testNormalizedMergesAdjacentSameName() {
+    @Test func testNormalizedMergesAdjacentSameName() {
         let events = [
             PlatformSpeakerEvent(name: "Alice", start: 0, end: 2),
             PlatformSpeakerEvent(name: "Alice", start: 2.2, end: 5),
             PlatformSpeakerEvent(name: "Bob", start: 6, end: 8),
         ]
         let out = PlatformSpeakerTurnBuilder.normalized(events)
-        XCTAssertEqual(out.count, 2)
-        XCTAssertEqual(out[0].name, "Alice")
-        XCTAssertEqual(out[0].start, 0)
-        XCTAssertEqual(out[0].end, 5)
-        XCTAssertEqual(out[1].name, "Bob")
+        #expect(out.count == 2)
+        #expect(out[0].name == "Alice")
+        #expect(out[0].start == 0)
+        #expect(out[0].end == 5)
+        #expect(out[1].name == "Bob")
     }
 
-    func testNamedSpeakersUseDisplayNames() {
+    @Test func testNamedSpeakersUseDisplayNames() {
         let system = TranscriptionOutput(
             words: [
                 TranscribedWord(text: "hello", start: 0.0, end: 0.5),
@@ -104,110 +91,105 @@ final class PlatformSpeakerTests: XCTestCase {
             myName: "Me",
             namedSpeakers: true)
 
-        XCTAssertEqual(speakers.map(\.name), ["Jimmy Veloso", "Gui Lima"])
+        #expect(speakers.map(\.name) == ["Jimmy Veloso", "Gui Lima"])
     }
 
-    func testParseZoomCaptionLine() {
-        XCTAssertEqual(
-            ZoomActiveSpeakerReader.parseZoomCaptionLine("Gui Lima: hello everyone")?.name,
-            "Gui Lima")
-        XCTAssertEqual(
-            ZoomActiveSpeakerReader.parseZoomCaptionLine("Paulo said: let's ship it")?.name,
-            "Paulo")
-        XCTAssertNil(ZoomActiveSpeakerReader.parseZoomCaptionLine("Mute"))
+    @Test func testParseZoomCaptionLine() {
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine("Gui Lima: hello everyone")?.name == "Gui Lima")
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine("Paulo said: let's ship it")?.name == "Paulo")
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine("Mute") == nil)
     }
 
-    func testParseParticipantRow() {
-        XCTAssertEqual(ZoomActiveSpeakerReader.parseParticipantRow("Victor Moura"), "Victor Moura")
-        XCTAssertNil(ZoomActiveSpeakerReader.parseParticipantRow("Participants (5)"))
-        XCTAssertNil(
-            ZoomActiveSpeakerReader.parseParticipantRow(
-                "Gui Lima, Computer audio unmuted, Video on"))
+    @Test func testParseParticipantRow() {
+        #expect(ZoomActiveSpeakerReader.parseParticipantRow("Victor Moura") == "Victor Moura")
+        #expect(ZoomActiveSpeakerReader.parseParticipantRow("Participants (5)") == nil)
+        #expect(ZoomActiveSpeakerReader.parseParticipantRow(
+                "Gui Lima, Computer audio unmuted, Video on") == nil)
     }
 
     // MARK: - #88: parser edge cases
 
-    func testParseSpeakingLabelEdgeCases() {
+    @Test func testParseSpeakingLabelEdgeCases() {
         // Empty / whitespace-only input → nil (guard before regex).
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel(""))
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("   "))
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("\n\t"))
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("") == nil)
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("   ") == nil)
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("\n\t") == nil)
 
         // Ignored exact-match strings (Zoom UI labels, not names).
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("Mute"))
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("Unmute"))
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("Participants"))
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("Host"))
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Mute") == nil)
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Unmute") == nil)
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Participants") == nil)
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Host") == nil)
 
         // Single-character "names" fail the min-length (>= 2) check.
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("A is speaking"))
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("A is speaking") == nil)
 
         // All-whitespace "names" are rejected by `cleaned`.
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("    is speaking"))
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("    is speaking") == nil)
 
         // "zoom"-prefixed strings are rejected (Zoom UI, not a participant).
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("Zoom Host is speaking"))
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Zoom Host is speaking") == nil)
 
         // Names with @ are rejected (looks like an email / meeting ID).
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel("user@example.com is speaking"))
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("user@example.com is speaking") == nil)
 
         // Each of the six supported label shapes must still parse.
-        XCTAssertEqual(ZoomActiveSpeakerReader.parseSpeakingLabel("Alice Rivera, unmuted"), "Alice Rivera")
-        XCTAssertEqual(ZoomActiveSpeakerReader.parseSpeakingLabel("Alice Rivera, unmuted audio"), "Alice Rivera")
-        XCTAssertEqual(ZoomActiveSpeakerReader.parseSpeakingLabel("Bob is speaking"), "Bob")
-        XCTAssertEqual(ZoomActiveSpeakerReader.parseSpeakingLabel("Bob is talking"), "Bob")
-        XCTAssertEqual(ZoomActiveSpeakerReader.parseSpeakingLabel("Speaking: Carol"), "Carol")
-        XCTAssertEqual(ZoomActiveSpeakerReader.parseSpeakingLabel("Active Speaker: Dan"), "Dan")
-        XCTAssertEqual(ZoomActiveSpeakerReader.parseSpeakingLabel("Eve, speaking"), "Eve")
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Alice Rivera, unmuted") == "Alice Rivera")
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Alice Rivera, unmuted audio") == "Alice Rivera")
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Bob is speaking") == "Bob")
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Bob is talking") == "Bob")
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Speaking: Carol") == "Carol")
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Active Speaker: Dan") == "Dan")
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("Eve, speaking") == "Eve")
 
         // Case-insensitive: "SPEAKING:" prefix matches.
-        XCTAssertEqual(ZoomActiveSpeakerReader.parseSpeakingLabel("SPEAKING: Frank"), "Frank")
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel("SPEAKING: Frank") == "Frank")
 
         // Gallery tile descriptions (with "Computer audio" / "Video on") are
         // roster metadata, NOT speaking labels — must be rejected.
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel(
-            "Gui Lima, Computer audio unmuted, Video on"))
-        XCTAssertNil(ZoomActiveSpeakerReader.parseSpeakingLabel(
-            "Acquila Santos Rocha, Computer audio unmuted, Video on, active speaker"))
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel(
+            "Gui Lima, Computer audio unmuted, Video on") == nil)
+        #expect(ZoomActiveSpeakerReader.parseSpeakingLabel(
+            "Acquila Santos Rocha, Computer audio unmuted, Video on, active speaker") == nil)
     }
 
-    func testParseZoomCaptionLineEdgeCases() {
+    @Test func testParseZoomCaptionLineEdgeCases() {
         // Empty / whitespace-only input → nil.
-        XCTAssertNil(ZoomActiveSpeakerReader.parseZoomCaptionLine(""))
-        XCTAssertNil(ZoomActiveSpeakerReader.parseZoomCaptionLine("   \n  "))
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine("") == nil)
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine("   \n  ") == nil)
 
         // Ignored exact-match names (Zoom UI labels) → nil.
-        XCTAssertNil(ZoomActiveSpeakerReader.parseZoomCaptionLine("Mute"))
-        XCTAssertNil(ZoomActiveSpeakerReader.parseZoomCaptionLine("Participants: hello"))
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine("Mute") == nil)
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine("Participants: hello") == nil)
 
         // Tile descriptions are NOT caption lines (contain "Computer audio").
-        XCTAssertNil(ZoomActiveSpeakerReader.parseZoomCaptionLine(
-            "Gui Lima, Computer audio unmuted, Video on"))
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine(
+            "Gui Lima, Computer audio unmuted, Video on") == nil)
 
         // Body too short (< 2 chars) → nil. The caption must have real content
         // after the colon, not just punctuation.
-        XCTAssertNil(ZoomActiveSpeakerReader.parseZoomCaptionLine("Alice: "))
-        XCTAssertNil(ZoomActiveSpeakerReader.parseZoomCaptionLine("Alice: x"))
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine("Alice: ") == nil)
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine("Alice: x") == nil)
 
         // Well-formed caption lines parse name + body.
         let caption = ZoomActiveSpeakerReader.parseZoomCaptionLine("Gui Lima: hello everyone")
-        XCTAssertEqual(caption?.name, "Gui Lima")
-        XCTAssertEqual(caption?.text, "hello everyone")
+        #expect(caption?.name == "Gui Lima")
+        #expect(caption?.text == "hello everyone")
 
         // "said:" variant captures a different speaker prefix.
         let said = ZoomActiveSpeakerReader.parseZoomCaptionLine("Paulo said: let's ship it")
-        XCTAssertEqual(said?.name, "Paulo")
-        XCTAssertEqual(said?.text, "let's ship it")
+        #expect(said?.name == "Paulo")
+        #expect(said?.text == "let's ship it")
 
         // Surrounding whitespace on the raw line is trimmed before matching.
         let trimmed = ZoomActiveSpeakerReader.parseZoomCaptionLine("  Bob Chen: hi there  ")
-        XCTAssertEqual(trimmed?.name, "Bob Chen")
-        XCTAssertEqual(trimmed?.text, "hi there")
+        #expect(trimmed?.name == "Bob Chen")
+        #expect(trimmed?.text == "hi there")
 
         // Single-character "name" → nil (min-length 2 in `cleaned`).
-        XCTAssertNil(ZoomActiveSpeakerReader.parseZoomCaptionLine("A: hello there"))
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine("A: hello there") == nil)
 
         // All-numeric "name" (a phone/meeting ID) → nil.
-        XCTAssertNil(ZoomActiveSpeakerReader.parseZoomCaptionLine("12345: hello there"))
+        #expect(ZoomActiveSpeakerReader.parseZoomCaptionLine("12345: hello there") == nil)
     }
 }

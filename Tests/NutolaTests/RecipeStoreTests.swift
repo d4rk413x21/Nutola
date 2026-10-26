@@ -1,7 +1,8 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class RecipeStoreTests: XCTestCase {
+final class RecipeStoreTests {
     /// Each test gets a private UserDefaults suite so nothing leaks across tests
     /// or into the user's real recipe library.
     private let suiteName = "NutolaTests.RecipeStore.\(UUID().uuidString)"
@@ -13,43 +14,42 @@ final class RecipeStoreTests: XCTestCase {
         return RecipeStore(defaults: defaults, key: key)
     }
 
-    override func tearDown() {
+    deinit {
         UserDefaults().removePersistentDomain(forName: suiteName)
-        super.tearDown()
     }
 
-    func testEmptyStore() {
+    @Test func testEmptyStore() {
         let store = makeStore()
-        XCTAssertTrue(store.all().isEmpty)
-        XCTAssertNil(store.recipe(named: "Anything"))
+        #expect(store.all().isEmpty)
+        #expect(store.recipe(named: "Anything") == nil)
     }
 
-    func testAddRecipe() {
+    @Test func testAddRecipe() {
         let store = makeStore()
         let recipe = store.add(name: "Weekly recap", prompt: "Summarize my week")
 
-        XCTAssertEqual(store.all().count, 1)
-        XCTAssertEqual(recipe.name, "Weekly recap")
-        XCTAssertEqual(recipe.prompt, "Summarize my week")
-        XCTAssertEqual(store.all().first, recipe)
+        #expect(store.all().count == 1)
+        #expect(recipe.name == "Weekly recap")
+        #expect(recipe.prompt == "Summarize my week")
+        #expect(store.all().first == recipe)
 
         // A fresh store backed by the *same* suite should see the recipe —
         // it has to survive across instances (UserDefaults persistence).
         let defaults = UserDefaults(suiteName: suiteName)!
         let reloaded = RecipeStore(defaults: defaults, key: key)
-        XCTAssertEqual(reloaded.all(), [recipe])
+        #expect(reloaded.all() == [recipe])
     }
 
-    func testDeleteRecipe() {
+    @Test func testDeleteRecipe() {
         let store = makeStore()
         let recipe = store.add(name: "Action items", prompt: "List action items")
-        XCTAssertEqual(store.all().count, 1)
+        #expect(store.all().count == 1)
 
         store.delete(id: recipe.id)
-        XCTAssertTrue(store.all().isEmpty)
+        #expect(store.all().isEmpty)
     }
 
-    func testUpdateRecipe() {
+    @Test func testUpdateRecipe() {
         let store = makeStore()
         let original = store.add(name: "Follow-up", prompt: "Draft a follow-up")
 
@@ -59,30 +59,30 @@ final class RecipeStoreTests: XCTestCase {
         store.update(updated)
 
         let recipes = store.all()
-        XCTAssertEqual(recipes.count, 1)
-        XCTAssertEqual(recipes.first?.name, "Follow-up email")
-        XCTAssertEqual(recipes.first?.prompt, "Draft a polite follow-up email")
-        XCTAssertEqual(recipes.first?.id, original.id)
+        #expect(recipes.count == 1)
+        #expect(recipes.first?.name == "Follow-up email")
+        #expect(recipes.first?.prompt == "Draft a polite follow-up email")
+        #expect(recipes.first?.id == original.id)
     }
 
-    func testRecipeNamed() {
+    @Test func testRecipeNamed() {
         let store = makeStore()
         _ = store.add(name: "Decisions", prompt: "What decisions came out?")
 
         // Case-insensitive lookup matches the TemplateStore convention.
-        XCTAssertEqual(store.recipe(named: "Decisions")?.name, "Decisions")
-        XCTAssertEqual(store.recipe(named: "decisions")?.name, "Decisions")
-        XCTAssertEqual(store.recipe(named: "DECISIONS")?.name, "Decisions")
-        XCTAssertNil(store.recipe(named: "Missing"))
+        #expect(store.recipe(named: "Decisions")?.name == "Decisions")
+        #expect(store.recipe(named: "decisions")?.name == "Decisions")
+        #expect(store.recipe(named: "DECISIONS")?.name == "Decisions")
+        #expect(store.recipe(named: "Missing") == nil)
     }
 
-    func testAllSortedByName() {
+    @Test func testAllSortedByName() {
         let store = makeStore()
         _ = store.add(name: "Zebra", prompt: "z")
         _ = store.add(name: "alpha", prompt: "a")
         _ = store.add(name: "Mango", prompt: "m")
 
         let names = store.all().map(\.name)
-        XCTAssertEqual(names, ["alpha", "Mango", "Zebra"])
+        #expect(names == ["alpha", "Mango", "Zebra"])
     }
 }

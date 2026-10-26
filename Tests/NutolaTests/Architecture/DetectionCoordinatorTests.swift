@@ -1,8 +1,9 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
 @MainActor
-final class DetectionCoordinatorTests: XCTestCase {
+struct DetectionCoordinatorTests {
     private func makeCoordinator(
         settings: MockSettingsRepository = MockSettingsRepository(),
         recording: MockRecordingService,
@@ -38,7 +39,7 @@ final class DetectionCoordinatorTests: XCTestCase {
         return (coordinator, detection, settings, start, stop)
     }
 
-    func testAutoRecordStartsCapture() async {
+    @Test func testAutoRecordStartsCapture() async {
         var settings = MockSettingsRepository()
         settings.autoRecord = true
         let recording = MockRecordingService()
@@ -55,10 +56,10 @@ final class DetectionCoordinatorTests: XCTestCase {
         detection.emit(ArchitectureFixtures.micEvent())
         try? await Task.sleep(for: .milliseconds(50))
 
-        XCTAssertEqual(recording.startCallCount, 1)
+        #expect(recording.startCallCount == 1)
     }
 
-    func testManualDetectionSurfacesAppName() async {
+    @Test func testManualDetectionSurfacesAppName() async {
         var settings = MockSettingsRepository()
         settings.autoRecord = false
         let (coordinator, detection, _, _, _) = makeCoordinator(settings: settings, recording: MockRecordingService())
@@ -71,10 +72,10 @@ final class DetectionCoordinatorTests: XCTestCase {
         detection.emit(ArchitectureFixtures.micEvent())
         try? await Task.sleep(for: .milliseconds(50))
 
-        XCTAssertEqual(detected, "Zoom")
+        #expect(detected == "Zoom")
     }
 
-    func testDismissDetectionClearsPendingApp() async {
+    @Test func testDismissDetectionClearsPendingApp() async {
         let (coordinator, detection, _, _, _) = makeCoordinator(recording: MockRecordingService())
         var detected: String? = "pending"
         coordinator.onDetectedAppNameChanged = { detected = $0 }
@@ -86,10 +87,10 @@ final class DetectionCoordinatorTests: XCTestCase {
 
         coordinator.dismissDetection()
 
-        XCTAssertNil(detected)
+        #expect(detected == nil)
     }
 
-    func testAutoStopTriggersStopUseCase() async {
+    @Test func testAutoStopTriggersStopUseCase() async {
         var settings = MockSettingsRepository()
         settings.autoStopRecording = true
         let recording = MockRecordingService()
@@ -134,11 +135,11 @@ final class DetectionCoordinatorTests: XCTestCase {
 
         try? await Task.sleep(for: .seconds(9))
 
-        XCTAssertEqual(recording.stopCallCount, 1)
-        XCTAssertEqual(processing.processCallCount, 1)
+        #expect(recording.stopCallCount == 1)
+        #expect(processing.processCallCount == 1)
     }
 
-    func testMicReconnectCancelsPendingAutoStop() async {
+    @Test func testMicReconnectCancelsPendingAutoStop() async {
         var settings = MockSettingsRepository()
         settings.autoStopRecording = true
         let recording = MockRecordingService()
@@ -170,6 +171,6 @@ final class DetectionCoordinatorTests: XCTestCase {
         detection.emit(ArchitectureFixtures.micEvent(running: true))
         try? await Task.sleep(for: .seconds(9))
 
-        XCTAssertEqual(recording.stopCallCount, 0)
+        #expect(recording.stopCallCount == 0)
     }
 }

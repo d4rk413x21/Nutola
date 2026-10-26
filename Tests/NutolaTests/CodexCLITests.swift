@@ -1,8 +1,9 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class CodexCLITests: XCTestCase {
-    func testLoginProbeReadsStderrAndRejectsLoggedOutStatus() throws {
+struct CodexCLITests {
+    @Test func testLoginProbeReadsStderrAndRejectsLoggedOutStatus() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("codex login \(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -11,32 +12,32 @@ final class CodexCLITests: XCTestCase {
             let script = "#!/bin/sh\nprintf '%s' \(CLIExecutable.quote(message)) >&2\nexit \(status)\n"
             try Data(script.utf8).write(to: binary)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
-            XCTAssertEqual(CodexCLI.probeLoggedIn(executable: binary), expected)
+            #expect(CodexCLI.probeLoggedIn(executable: binary) == expected)
         }
     }
 
-    func testAnalysisDoesNotLoadUserToolsOrBypassTheSandbox() {
+    @Test func testAnalysisDoesNotLoadUserToolsOrBypassTheSandbox() {
         let output = URL(fileURLWithPath: "/tmp/result with spaces.json")
         let prompt = "Return JSON; don't run $(anything)."
         let args = CodexCLI.buildArgs(prompt: prompt, outputFile: output, analysisOnly: true)
-        XCTAssertTrue(args.contains("--ignore-user-config"))
-        XCTAssertTrue(args.contains("--no-daemon"))
-        XCTAssertTrue(args.contains("--ignore-rules"))
-        XCTAssertTrue(args.contains("--sandbox"))
-        XCTAssertTrue(args.contains("read-only"))
-        XCTAssertTrue(args.contains("web_search=\"disabled\""))
-        XCTAssertFalse(args.contains("--dangerously-bypass-approvals-and-sandbox"))
+        #expect(args.contains("--ignore-user-config"))
+        #expect(args.contains("--no-daemon"))
+        #expect(args.contains("--ignore-rules"))
+        #expect(args.contains("--sandbox"))
+        #expect(args.contains("read-only"))
+        #expect(args.contains("web_search=\"disabled\""))
+        #expect(!(args.contains("--dangerously-bypass-approvals-and-sandbox")))
         for feature in ["shell_tool", "plugins", "apps", "multi_agent", "view_image", "image_generation", "computer_use"] {
             let index = args.firstIndex(of: feature)!
-            XCTAssertEqual(args[index - 1], "--disable")
+            #expect(args[index - 1] == "--disable")
         }
-        XCTAssertEqual(args.last, prompt)
-        XCTAssertTrue(args.contains(output.path))
+        #expect(args.last == prompt)
+        #expect(args.contains(output.path))
     }
 
-    func testExistingInvocationsKeepTheirArguments() {
+    @Test func testExistingInvocationsKeepTheirArguments() {
         let args = CodexCLI.buildArgs(prompt: "Ask", outputFile: URL(fileURLWithPath: "/tmp/result.md"))
-        XCTAssertEqual(args, ["exec", "--dangerously-bypass-approvals-and-sandbox", "-s", "read-only",
+        #expect(args == ["exec", "--dangerously-bypass-approvals-and-sandbox", "-s", "read-only",
                               "--ephemeral", "--skip-git-repo-check", "--output-last-message", "/tmp/result.md", "Ask"])
     }
 }

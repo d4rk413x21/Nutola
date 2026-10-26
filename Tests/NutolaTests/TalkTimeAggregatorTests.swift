@@ -1,10 +1,11 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class TalkTimeAggregatorTests: XCTestCase {
+struct TalkTimeAggregatorTests {
     // MARK: - Single speaker, single meeting
 
-    func testSingleSpeakerSingleMeeting() throws {
+    @Test func testSingleSpeakerSingleMeeting() throws {
         let meeting = Meeting(title: "M1", createdAt: Date(), duration: 60)
         let speakers = [Speaker(id: "me", name: "Me", isMe: true)]
         let segments = [
@@ -16,19 +17,19 @@ final class TalkTimeAggregatorTests: XCTestCase {
             transcripts: [(meeting.id, segments)],
             speakers: [(meeting.id, speakers)])
 
-        XCTAssertEqual(summaries.count, 1)
-        let s = try XCTUnwrap(summaries.first)
-        XCTAssertEqual(s.speakerID, "me")
-        XCTAssertEqual(s.name, "Me")
-        XCTAssertEqual(s.totalTalkTime, 60, accuracy: 0.001)
-        XCTAssertEqual(s.meetingCount, 1)
-        XCTAssertEqual(s.avgTalkTimePerMeeting, 60, accuracy: 0.001)
-        XCTAssertEqual(s.percentageOfTotal, 100, accuracy: 0.001)
+        #expect(summaries.count == 1)
+        let s = try #require(summaries.first)
+        #expect(s.speakerID == "me")
+        #expect(s.name == "Me")
+        #expect(abs((s.totalTalkTime) - (60)) <= 0.001)
+        #expect(s.meetingCount == 1)
+        #expect(abs((s.avgTalkTimePerMeeting) - (60)) <= 0.001)
+        #expect(abs((s.percentageOfTotal) - (100)) <= 0.001)
     }
 
     // MARK: - Multiple speakers aggregated across meetings
 
-    func testMultipleSpeakersAggregated() throws {
+    @Test func testMultipleSpeakersAggregated() throws {
         let m1 = Meeting(title: "M1", createdAt: Date(), duration: 60)
         let m2 = Meeting(title: "M2", createdAt: Date(), duration: 60)
         let speakers = [
@@ -53,18 +54,18 @@ final class TalkTimeAggregatorTests: XCTestCase {
             speakers: [(m1.id, speakers), (m2.id, speakers)])
 
         let byID = Dictionary(uniqueKeysWithValues: summaries.map { ($0.speakerID, $0) })
-        XCTAssertEqual(summaries.count, 2)
-        let me = try XCTUnwrap(byID["me"])
-        let alice = try XCTUnwrap(byID["alice"])
-        XCTAssertEqual(me.totalTalkTime, 50, accuracy: 0.001)
-        XCTAssertEqual(alice.totalTalkTime, 70, accuracy: 0.001)
-        XCTAssertEqual(me.meetingCount, 2)
-        XCTAssertEqual(alice.meetingCount, 2)
+        #expect(summaries.count == 2)
+        let me = try #require(byID["me"])
+        let alice = try #require(byID["alice"])
+        #expect(abs((me.totalTalkTime) - (50)) <= 0.001)
+        #expect(abs((alice.totalTalkTime) - (70)) <= 0.001)
+        #expect(me.meetingCount == 2)
+        #expect(alice.meetingCount == 2)
     }
 
     // MARK: - Average per meeting
 
-    func testAvgPerMeeting() throws {
+    @Test func testAvgPerMeeting() throws {
         let m1 = Meeting(title: "M1", createdAt: Date(), duration: 60)
         let m2 = Meeting(title: "M2", createdAt: Date(), duration: 90)
         let speakers = [Speaker(id: "me", name: "Me", isMe: true)]
@@ -78,15 +79,15 @@ final class TalkTimeAggregatorTests: XCTestCase {
             transcripts: [(m1.id, seg1), (m2.id, seg2)],
             speakers: [(m1.id, speakers), (m2.id, speakers)])
 
-        let s = try XCTUnwrap(summaries.first)
-        XCTAssertEqual(s.totalTalkTime, 90, accuracy: 0.001)
-        XCTAssertEqual(s.meetingCount, 2)
-        XCTAssertEqual(s.avgTalkTimePerMeeting, 45, accuracy: 0.001)
+        let s = try #require(summaries.first)
+        #expect(abs((s.totalTalkTime) - (90)) <= 0.001)
+        #expect(s.meetingCount == 2)
+        #expect(abs((s.avgTalkTimePerMeeting) - (45)) <= 0.001)
     }
 
     // MARK: - Percentage of total
 
-    func testPercentageOfTotal() throws {
+    @Test func testPercentageOfTotal() throws {
         let meeting = Meeting(title: "M1", createdAt: Date(), duration: 60)
         let speakers = [
             Speaker(id: "me", name: "Me", isMe: true),
@@ -104,28 +105,28 @@ final class TalkTimeAggregatorTests: XCTestCase {
             speakers: [(meeting.id, speakers)])
 
         let byID = Dictionary(uniqueKeysWithValues: summaries.map { ($0.speakerID, $0) })
-        let me = try XCTUnwrap(byID["me"])
-        let alice = try XCTUnwrap(byID["alice"])
-        XCTAssertEqual(me.percentageOfTotal, 25, accuracy: 0.001)
-        XCTAssertEqual(alice.percentageOfTotal, 75, accuracy: 0.001)
+        let me = try #require(byID["me"])
+        let alice = try #require(byID["alice"])
+        #expect(abs((me.percentageOfTotal) - (25)) <= 0.001)
+        #expect(abs((alice.percentageOfTotal) - (75)) <= 0.001)
         // Percentages should sum to 100.
         let total = summaries.reduce(0) { $0 + $1.percentageOfTotal }
-        XCTAssertEqual(total, 100, accuracy: 0.001)
+        #expect(abs((total) - (100)) <= 0.001)
     }
 
     // MARK: - Empty input
 
-    func testEmptyInput() {
+    @Test func testEmptyInput() {
         let summaries = TalkTimeAggregator.aggregate(
             meetings: [],
             transcripts: [],
             speakers: [])
-        XCTAssertTrue(summaries.isEmpty)
+        #expect(summaries.isEmpty)
     }
 
     // MARK: - Meeting without transcript is skipped
 
-    func testMeetingWithoutTranscript() throws {
+    @Test func testMeetingWithoutTranscript() throws {
         let m1 = Meeting(title: "M1", createdAt: Date(), duration: 60)
         let m2 = Meeting(title: "M2", createdAt: Date(), duration: 0)
         let speakers = [Speaker(id: "me", name: "Me", isMe: true)]
@@ -137,16 +138,16 @@ final class TalkTimeAggregatorTests: XCTestCase {
             transcripts: [(m1.id, seg1)],
             speakers: [(m1.id, speakers), (m2.id, speakers)])
 
-        XCTAssertEqual(summaries.count, 1)
-        let s = try XCTUnwrap(summaries.first)
-        XCTAssertEqual(s.speakerID, "me")
-        XCTAssertEqual(s.meetingCount, 1)
-        XCTAssertEqual(s.totalTalkTime, 30, accuracy: 0.001)
+        #expect(summaries.count == 1)
+        let s = try #require(summaries.first)
+        #expect(s.speakerID == "me")
+        #expect(s.meetingCount == 1)
+        #expect(abs((s.totalTalkTime) - (30)) <= 0.001)
     }
 
     // MARK: - Sorting by talk time descending
 
-    func testSortingByTalkTimeDescending() {
+    @Test func testSortingByTalkTimeDescending() {
         let m1 = Meeting(title: "M1", createdAt: Date(), duration: 60)
         let m2 = Meeting(title: "M2", createdAt: Date(), duration: 60)
         let speakers = [
@@ -173,15 +174,15 @@ final class TalkTimeAggregatorTests: XCTestCase {
             transcripts: [(m1.id, seg1), (m2.id, seg2)],
             speakers: [(m1.id, speakers), (m2.id, speakers)])
 
-        XCTAssertEqual(summaries.map { $0.speakerID }, ["me", "alice", "bob"])
-        XCTAssertEqual(summaries[0].totalTalkTime, 60, accuracy: 0.001)
-        XCTAssertEqual(summaries[1].totalTalkTime, 40, accuracy: 0.001)
-        XCTAssertEqual(summaries[2].totalTalkTime, 20, accuracy: 0.001)
+        #expect(summaries.map { $0.speakerID } == ["me", "alice", "bob"])
+        #expect(abs((summaries[0].totalTalkTime) - (60)) <= 0.001)
+        #expect(abs((summaries[1].totalTalkTime) - (40)) <= 0.001)
+        #expect(abs((summaries[2].totalTalkTime) - (20)) <= 0.001)
     }
 
     // MARK: - Same display name across meetings collapses (the bug fix)
 
-    func testSameDisplayNameAcrossMeetingsMerges() throws {
+    @Test func testSameDisplayNameAcrossMeetingsMerges() throws {
         // The original bug: SpeakerLabeler resets IDs per meeting, so "Gui Lima"
         // appears as s1 in M1 and s2 in M2 — the aggregator used to emit two
         // rows. With name-based keying they should collapse into one.
@@ -205,17 +206,17 @@ final class TalkTimeAggregatorTests: XCTestCase {
             speakers: [(m1.id, speakersM1), (m2.id, speakersM2)])
 
         // Two rows: "Me" and "Gui Lima" — NOT three.
-        XCTAssertEqual(summaries.count, 2)
-        let gui = try XCTUnwrap(summaries.first { $0.name == "Gui Lima" })
+        #expect(summaries.count == 2)
+        let gui = try #require(summaries.first { $0.name == "Gui Lima" })
         // 30s (M1) + 20s (M2) = 50s, across 2 meetings.
-        XCTAssertEqual(gui.totalTalkTime, 50, accuracy: 0.001)
-        XCTAssertEqual(gui.meetingCount, 2)
+        #expect(abs((gui.totalTalkTime) - (50)) <= 0.001)
+        #expect(gui.meetingCount == 2)
     }
 
-    func testNameKeyNormalizes() {
+    @Test func testNameKeyNormalizes() {
         // Case + whitespace differences collapse to one key.
-        XCTAssertEqual(TalkTimeAggregator.nameKey("Gui Lima"), TalkTimeAggregator.nameKey("gui lima"))
-        XCTAssertEqual(TalkTimeAggregator.nameKey("Gui  Lima "), TalkTimeAggregator.nameKey("Gui Lima"))
-        XCTAssertEqual(TalkTimeAggregator.nameKey("  "), "")
+        #expect(TalkTimeAggregator.nameKey("Gui Lima") == TalkTimeAggregator.nameKey("gui lima"))
+        #expect(TalkTimeAggregator.nameKey("Gui  Lima ") == TalkTimeAggregator.nameKey("Gui Lima"))
+        #expect(TalkTimeAggregator.nameKey("  ") == "")
     }
 }

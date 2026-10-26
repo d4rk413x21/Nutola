@@ -1,84 +1,85 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
 @MainActor
-final class FolderArchiveTests: XCTestCase {
+final class FolderArchiveTests {
     var tmp: URL!
     var archive: FolderArchive!
 
-    override func setUp() {
+    init() {
         tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-folder-tests-\(UUID().uuidString)")
         archive = FolderArchive(root: tmp)
     }
 
-    override func tearDown() {
+    isolated deinit {
         try? FileManager.default.removeItem(at: tmp)
     }
 
-    func testFolderRoundTrip() throws {
+    @Test func testFolderRoundTrip() throws {
         let folder = MeetingFolder(name: "Eng Standup", createdAt: Date())
         try archive.save(folder)
-        XCTAssertEqual(archive.allFolders().map(\.id), [folder.id])
-        XCTAssertEqual(archive.allFolders().first?.name, "Eng Standup")
+        #expect(archive.allFolders().map(\.id) == [folder.id])
+        #expect(archive.allFolders().first?.name == "Eng Standup")
     }
 
-    func testUpdateFolder() throws {
+    @Test func testUpdateFolder() throws {
         var folder = MeetingFolder(name: "Old", createdAt: Date())
         try archive.save(folder)
         folder.name = "New"
         try archive.save(folder)
-        XCTAssertEqual(archive.allFolders().count, 1)
-        XCTAssertEqual(archive.allFolders().first?.name, "New")
+        #expect(archive.allFolders().count == 1)
+        #expect(archive.allFolders().first?.name == "New")
     }
 
-    func testUpdateFolderDescription() throws {
+    @Test func testUpdateFolderDescription() throws {
         var folder = MeetingFolder(name: "Team", description: "Weekly syncs", createdAt: Date())
         try archive.save(folder)
         folder.description = "1:1 notes and standups"
         try archive.save(folder)
-        XCTAssertEqual(archive.allFolders().first?.description, "1:1 notes and standups")
+        #expect(archive.allFolders().first?.description == "1:1 notes and standups")
     }
 
-    func testDeleteFolderClearsRules() throws {
+    @Test func testDeleteFolderClearsRules() throws {
         let folder = MeetingFolder(name: "Team", createdAt: Date())
         try archive.save(folder)
         try archive.setRule(normalizedTitle: "standup", folderID: folder.id)
-        XCTAssertEqual(archive.allTitleRules().count, 1)
+        #expect(archive.allTitleRules().count == 1)
         try archive.deleteFolder(id: folder.id)
-        XCTAssertTrue(archive.allFolders().isEmpty)
-        XCTAssertTrue(archive.allTitleRules().isEmpty)
+        #expect(archive.allFolders().isEmpty)
+        #expect(archive.allTitleRules().isEmpty)
     }
 
-    func testRuleLookup() throws {
+    @Test func testRuleLookup() throws {
         let folder = MeetingFolder(name: "1:1s", createdAt: Date())
         try archive.save(folder)
         try archive.setRule(normalizedTitle: "weekly 1:1", folderID: folder.id)
         let rule = archive.rule(forTitle: "  Weekly  1:1  ")
-        XCTAssertEqual(rule?.folderID, folder.id)
+        #expect(rule?.folderID == folder.id)
     }
 
-    func testSetRuleUpserts() throws {
+    @Test func testSetRuleUpserts() throws {
         let a = MeetingFolder(name: "A", createdAt: Date())
         let b = MeetingFolder(name: "B", createdAt: Date())
         try archive.save(a)
         try archive.save(b)
         try archive.setRule(normalizedTitle: "sync", folderID: a.id)
         try archive.setRule(normalizedTitle: "sync", folderID: b.id)
-        XCTAssertEqual(archive.allTitleRules().count, 1)
-        XCTAssertEqual(archive.rule(forTitle: "sync")?.folderID, b.id)
+        #expect(archive.allTitleRules().count == 1)
+        #expect(archive.rule(forTitle: "sync")?.folderID == b.id)
     }
 }
 
 @MainActor
-final class MeetingFolderStoreTests: XCTestCase {
+final class MeetingFolderStoreTests {
     var tmp: URL!
     var meetingArchive: MeetingArchive!
     var folderArchive: FolderArchive!
     var meetingStore: MeetingStore!
     var folderStore: MeetingFolderStore!
 
-    override func setUp() {
+    init() {
         tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-folder-store-\(UUID().uuidString)")
         meetingArchive = MeetingArchive(root: tmp)
@@ -87,7 +88,7 @@ final class MeetingFolderStoreTests: XCTestCase {
         folderStore = MeetingFolderStore(archive: folderArchive)
     }
 
-    override func tearDown() {
+    isolated deinit {
         try? FileManager.default.removeItem(at: tmp)
     }
 
@@ -101,37 +102,37 @@ final class MeetingFolderStoreTests: XCTestCase {
         return m
     }
 
-    func testCreateFolderWithDescription() {
+    @Test func testCreateFolderWithDescription() {
         let folder = folderStore.createFolder(
             name: "Standups",
             description: "Engineering team recurring meetings")
-        XCTAssertEqual(folder.description, "Engineering team recurring meetings")
-        XCTAssertEqual(folderStore.folder(id: folder.id)?.description, "Engineering team recurring meetings")
+        #expect(folder.description == "Engineering team recurring meetings")
+        #expect(folderStore.folder(id: folder.id)?.description == "Engineering team recurring meetings")
     }
 
-    func testAssignWritesRuleAndBackfills() {
+    @Test func testAssignWritesRuleAndBackfills() {
         let folder = folderStore.createFolder(name: "Standups")
         let old = makeMeeting(title: "Standup", calendarTitle: "Engineering Standup")
         folderStore.assign(meetingID: old.id, to: folder.id, meetingStore: meetingStore)
-        XCTAssertEqual(meetingStore.meeting(id: old.id)?.folderID, folder.id)
-        XCTAssertNotNil(folderArchive.rule(forTitle: "Engineering Standup"))
+        #expect(meetingStore.meeting(id: old.id)?.folderID == folder.id)
+        #expect(folderArchive.rule(forTitle: "Engineering Standup") != nil)
 
         let unfiled = makeMeeting(title: "Engineering Standup", calendarTitle: "Engineering Standup")
-        XCTAssertEqual(unfiled.folderID, nil)
+        #expect(unfiled.folderID == nil)
         folderStore.assign(calendarTitle: "Engineering Standup", to: folder.id, meetingStore: meetingStore)
-        XCTAssertEqual(meetingStore.meeting(id: unfiled.id)?.folderID, folder.id)
+        #expect(meetingStore.meeting(id: unfiled.id)?.folderID == folder.id)
     }
 
-    func testDeleteFolderUnfilesMeetings() {
+    @Test func testDeleteFolderUnfilesMeetings() {
         let folder = folderStore.createFolder(name: "Temp")
         let m = makeMeeting(title: "Notes")
         folderStore.assign(meetingID: m.id, to: folder.id, meetingStore: meetingStore)
         folderStore.deleteFolder(id: folder.id, meetingStore: meetingStore)
-        XCTAssertNil(meetingStore.meeting(id: m.id)?.folderID)
-        XCTAssertTrue(folderStore.folders.isEmpty)
+        #expect(meetingStore.meeting(id: m.id)?.folderID == nil)
+        #expect(folderStore.folders.isEmpty)
     }
 
-    func testMeetingsInFolderSortedNewestFirst() {
+    @Test func testMeetingsInFolderSortedNewestFirst() {
         let folder = folderStore.createFolder(name: "Series")
         let older = makeMeeting(title: "A")
         var newer = makeMeeting(title: "B")
@@ -140,6 +141,6 @@ final class MeetingFolderStoreTests: XCTestCase {
         folderStore.assign(meetingID: older.id, to: folder.id, meetingStore: meetingStore)
         folderStore.assign(meetingID: newer.id, to: folder.id, meetingStore: meetingStore)
         let listed = folderStore.meetings(in: folder.id, from: meetingStore)
-        XCTAssertEqual(listed.map(\.id), [newer.id, older.id])
+        #expect(listed.map(\.id) == [newer.id, older.id])
     }
 }

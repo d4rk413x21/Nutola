@@ -1,18 +1,26 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class TranscriptionModelSelectionTests: XCTestCase {
-    func testSelectionRoutesToActualEngine() {
-        XCTAssertEqual(Transcriber.resolveEngine(for: .apple), .apple)
-        XCTAssertEqual(Transcriber.resolveEngine(for: .parakeetRedux), .parakeet(.parakeetRedux))
-        XCTAssertEqual(Transcriber.resolveEngine(for: .parakeetUltra), .parakeet(.parakeetUltra))
-    }
-
-    func testSelectedEngineTracksStoredPreference() {
-        for model in TranscriptionModel.allCases {
-            UserDefaults.standard.set(model.rawValue, forKey: SettingsKey.transcriptionModel)
-            XCTAssertEqual(Transcriber.resolveEngine(), Transcriber.resolveEngine(for: model))
+extension SharedStateTests {
+    struct TranscriptionModelSelectionTests {
+        @Test func testSelectionRoutesToActualEngine() {
+            #expect(Transcriber.resolveEngine(for: .apple) == .apple)
+            #expect(Transcriber.resolveEngine(for: .parakeetRedux) == .parakeet(.parakeetRedux))
+            #expect(Transcriber.resolveEngine(for: .parakeetUltra) == .parakeet(.parakeetUltra))
         }
-        UserDefaults.standard.removeObject(forKey: SettingsKey.transcriptionModel)
+
+        @Test func testSelectedEngineTracksStoredPreference() {
+            let key = SettingsKey.transcriptionModel
+            let previous = UserDefaults.standard.object(forKey: key)
+            defer {
+                if let previous { UserDefaults.standard.set(previous, forKey: key) }
+                else { UserDefaults.standard.removeObject(forKey: key) }
+            }
+            for model in TranscriptionModel.allCases {
+                UserDefaults.standard.set(model.rawValue, forKey: SettingsKey.transcriptionModel)
+                #expect(Transcriber.resolveEngine() == Transcriber.resolveEngine(for: model))
+            }
+        }
     }
 }

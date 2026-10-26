@@ -1,7 +1,8 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class FollowupDetectorTests: XCTestCase {
+struct FollowupDetectorTests {
     // A fixed "now" so weekday math is deterministic. 2026-07-15 is a Wednesday.
     // Calendar weekday codes: 1=Sunday … 7=Saturday; Wednesday = 4.
     private let now = makeNow()
@@ -32,100 +33,100 @@ final class FollowupDetectorTests: XCTestCase {
 
     // MARK: - Weekday phrase
 
-    func testDetectByFriday() {
+    @Test func testDetectByFriday() {
         // now = Wed 2026-07-15 09:00. "by Friday" → Fri 2026-07-17 (in 2 days).
         let transcript = "Alice: We should send the proposal by Friday to the client."
         let items = [actionItem("Send the proposal")]
         let result = FollowupDetector.detect(from: transcript, actionItems: items, now: now)
-        XCTAssertEqual(result.count, 1)
+        #expect(result.count == 1)
         let expected = calendar.date(byAdding: .day, value: 2, to: calendar.startOfDay(for: now))
-        XCTAssertEqual(result[0].dueDate, expected)
-        XCTAssertFalse(result[0].isOverdue)
-        XCTAssertFalse(result[0].sourceQuote.isEmpty)
+        #expect(result[0].dueDate == expected)
+        #expect(!(result[0].isOverdue))
+        #expect(!(result[0].sourceQuote.isEmpty))
     }
 
     // MARK: - Relative phrases
 
-    func testDetectTomorrow() {
+    @Test func testDetectTomorrow() {
         let transcript = "Let's follow up with sales tomorrow about the contract."
         let items = [actionItem("Follow up with sales")]
         let result = FollowupDetector.detect(from: transcript, actionItems: items, now: now)
-        XCTAssertEqual(result.count, 1)
+        #expect(result.count == 1)
         let expected = calendar.date(byAdding: .day, value: 1, to: now)
-        XCTAssertEqual(result[0].dueDate, expected)
-        XCTAssertFalse(result[0].isOverdue)
+        #expect(result[0].dueDate == expected)
+        #expect(!(result[0].isOverdue))
     }
 
-    func testDetectNextWeek() {
+    @Test func testDetectNextWeek() {
         let transcript = "We'll circle back next week on the roadmap."
         let items = [actionItem("Circle back on the roadmap")]
         let result = FollowupDetector.detect(from: transcript, actionItems: items, now: now)
-        XCTAssertEqual(result.count, 1)
+        #expect(result.count == 1)
         let expected = calendar.date(byAdding: .day, value: 7, to: now)
-        XCTAssertEqual(result[0].dueDate, expected)
-        XCTAssertFalse(result[0].isOverdue)
+        #expect(result[0].dueDate == expected)
+        #expect(!(result[0].isOverdue))
     }
 
     // MARK: - No due date
 
-    func testNoDueDate() {
+    @Test func testNoDueDate() {
         let transcript = "Alice will handle the onboarding docs when she has time."
         let items = [actionItem("Handle the onboarding docs")]
         let result = FollowupDetector.detect(from: transcript, actionItems: items, now: now)
-        XCTAssertEqual(result.count, 1)
-        XCTAssertNil(result[0].dueDate)
-        XCTAssertFalse(result[0].isOverdue)
-        XCTAssertEqual(result[0].sourceQuote, "")
+        #expect(result.count == 1)
+        #expect(result[0].dueDate == nil)
+        #expect(!(result[0].isOverdue))
+        #expect(result[0].sourceQuote == "")
     }
 
     // MARK: - Overdue
 
-    func testIsOverdue() {
+    @Test func testIsOverdue() {
         // A due date already in the past relative to `now` is overdue.
         let pastDate = calendar.date(byAdding: .day, value: -3, to: now)!
         let transcript = "We need the budget review done by \(formatDate(pastDate))."
         let items = [actionItem("Budget review")]
         let result = FollowupDetector.detect(from: transcript, actionItems: items, now: now)
-        XCTAssertEqual(result.count, 1)
-        XCTAssertNotNil(result[0].dueDate)
-        XCTAssertTrue(result[0].isOverdue, "past due date should be overdue")
+        #expect(result.count == 1)
+        #expect(result[0].dueDate != nil)
+        #expect(result[0].isOverdue, "past due date should be overdue")
     }
 
-    func testNotOverdue() {
+    @Test func testNotOverdue() {
         // A due date in the future is not overdue.
         let transcript = "Let's ship the feature by Friday."
         let items = [actionItem("Ship the feature")]
         let result = FollowupDetector.detect(from: transcript, actionItems: items, now: now)
-        XCTAssertEqual(result.count, 1)
-        XCTAssertNotNil(result[0].dueDate)
-        XCTAssertFalse(result[0].isOverdue)
+        #expect(result.count == 1)
+        #expect(result[0].dueDate != nil)
+        #expect(!(result[0].isOverdue))
     }
 
     // MARK: - Owner preservation
 
-    func testOwnerExtracted() {
+    @Test func testOwnerExtracted() {
         let transcript = "Bob will send the invoice by Friday."
         let items = [actionItem("Send the invoice", owner: "Bob")]
         let result = FollowupDetector.detect(from: transcript, actionItems: items, now: now)
-        XCTAssertEqual(result.count, 1)
-        XCTAssertEqual(result[0].owner, "Bob")
-        XCTAssertNotNil(result[0].dueDate)
+        #expect(result.count == 1)
+        #expect(result[0].owner == "Bob")
+        #expect(result[0].dueDate != nil)
     }
 
     // MARK: - Scan window
 
-    func testDuePhraseOutsideWindowIgnored() {
+    @Test func testDuePhraseOutsideWindowIgnored() {
         // A due phrase far from the item text (>200 chars away) shouldn't attach.
         let padding = String(repeating: "x", count: 250)
         let transcript = "Alice: Review the PR. \(padding) Sometime later: by Friday we ship."
         let items = [actionItem("Review the PR")]
         let result = FollowupDetector.detect(from: transcript, actionItems: items, now: now)
-        XCTAssertEqual(result.count, 1)
+        #expect(result.count == 1)
         // The far-away "by Friday" is outside the window, so no due date attaches.
-        XCTAssertNil(result[0].dueDate)
+        #expect(result[0].dueDate == nil)
     }
 
-    func testMultipleItemsResolveIndependently() {
+    @Test func testMultipleItemsResolveIndependently() {
         // The third turn is pushed >200 chars from the due phrases in the first
         // two turns, so its 200-char window contains no due phrase.
         let padding = String(repeating: "We discussed the roadmap and the Q3 priorities at length. ", count: 5)
@@ -140,24 +141,24 @@ final class FollowupDetectorTests: XCTestCase {
             actionItem("File the report")
         ]
         let result = FollowupDetector.detect(from: transcript, actionItems: items, now: now)
-        XCTAssertEqual(result.count, 3)
-        XCTAssertNotNil(result[0].dueDate, "first item has 'by Friday'")
-        XCTAssertNotNil(result[1].dueDate, "second item has 'tomorrow'")
-        XCTAssertNil(result[2].dueDate, "third item has no due phrase nearby")
+        #expect(result.count == 3)
+        #expect(result[0].dueDate != nil, "first item has 'by Friday'")
+        #expect(result[1].dueDate != nil, "second item has 'tomorrow'")
+        #expect(result[2].dueDate == nil, "third item has no due phrase nearby")
     }
 
     // MARK: - End of week
 
-    func testDetectByEndOfWeek() {
+    @Test func testDetectByEndOfWeek() {
         // now = Wed 2026-07-15. End of week = Sat 2026-07-18 23:59:59.
         let transcript = "Wrap up the migration by end of week."
         let items = [actionItem("Wrap up the migration")]
         let result = FollowupDetector.detect(from: transcript, actionItems: items, now: now)
-        XCTAssertEqual(result.count, 1)
+        #expect(result.count == 1)
         let saturday = calendar.date(byAdding: .day, value: 3, to: calendar.startOfDay(for: now))!
         let expected = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: saturday)
-        XCTAssertEqual(result[0].dueDate, expected)
-        XCTAssertFalse(result[0].isOverdue)
+        #expect(result[0].dueDate == expected)
+        #expect(!(result[0].isOverdue))
     }
 
     // MARK: - Helpers

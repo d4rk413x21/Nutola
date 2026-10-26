@@ -1,14 +1,13 @@
 import Foundation
-import XCTest
+import Testing
 @testable import Nutola
 
 @MainActor
-final class ImportAudioUseCaseTests: XCTestCase {
+final class ImportAudioUseCaseTests {
     private var tempDir: URL!
     private var testAudioURL: URL!
 
-    override func setUp() async throws {
-        try await super.setUp()
+    init() throws {
         tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("ImportAudio-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
@@ -16,9 +15,8 @@ final class ImportAudioUseCaseTests: XCTestCase {
         try Self.makeSilentWAV(at: testAudioURL, durationSeconds: 1.0)
     }
 
-    override func tearDown() async throws {
+    isolated deinit {
         try? FileManager.default.removeItem(at: tempDir)
-        try await super.tearDown()
     }
 
     /// Write a minimal 16-bit PCM WAV file with `durationSeconds` of silence.
@@ -73,32 +71,31 @@ final class ImportAudioUseCaseTests: XCTestCase {
                 .appendingPathComponent("ImportAudio-Folders-\(UUID().uuidString)", isDirectory: true)))
     }
 
-    func testImportCreatesMeetingAndCallsPipeline() async throws {
+    @Test func testImportCreatesMeetingAndCallsPipeline() async throws {
         let meetings = MockMeetingRepository()
         let (useCase, processing) = makeUseCase(
             meetings: meetings, folders: makeFolders())
 
         let id = try await useCase.execute(fileURL: testAudioURL, title: "Imported Chat")
         let saved = meetings.meeting(id: id)
-        XCTAssertNotNil(saved, "Imported meeting should be saved")
-        XCTAssertEqual(saved?.title, "Imported Chat")
-        XCTAssertEqual(saved?.sourceApp, "Audio Import")
-        XCTAssertTrue(FileManager.default.fileExists(
-            atPath: meetings.archive.systemURL(for: id).path),
-            "Audio file should be copied to the archive")
-        XCTAssertEqual(processing.processCallCount, 1, "Pipeline should run once")
+        #expect(saved != nil, "Imported meeting should be saved")
+        #expect(saved?.title == "Imported Chat")
+        #expect(saved?.sourceApp == "Audio Import")
+        #expect(FileManager.default.fileExists(
+            atPath: meetings.archive.systemURL(for: id).path), "Audio file should be copied to the archive")
+        #expect(processing.processCallCount == 1, "Pipeline should run once")
     }
 
-    func testImportUsesFileNameWhenTitleNil() async throws {
+    @Test func testImportUsesFileNameWhenTitleNil() async throws {
         let meetings = MockMeetingRepository()
         let (useCase, _) = makeUseCase(meetings: meetings, folders: makeFolders())
 
         let id = try await useCase.execute(fileURL: testAudioURL)
         let saved = meetings.meeting(id: id)
-        XCTAssertEqual(saved?.title, "sample", "Default title = file name without extension")
+        #expect(saved?.title == "sample", "Default title = file name without extension")
     }
 
-    func testImportRejectsUnsupportedFormat() async throws {
+    @Test func testImportRejectsUnsupportedFormat() async throws {
         let meetings = MockMeetingRepository()
         let (useCase, _) = makeUseCase(meetings: meetings, folders: makeFolders())
 
@@ -106,22 +103,22 @@ final class ImportAudioUseCaseTests: XCTestCase {
         try Data("not audio".utf8).write(to: badURL)
         do {
             _ = try await useCase.execute(fileURL: badURL)
-            XCTFail("Expected import to fail for .txt")
+            Issue.record("Expected import to fail for .txt")
         } catch {
-            XCTAssertTrue(error is ImportError)
+            #expect(error is ImportError)
         }
     }
 
-    func testImportRejectsMissingFile() async {
+    @Test func testImportRejectsMissingFile() async {
         let meetings = MockMeetingRepository()
         let (useCase, _) = makeUseCase(meetings: meetings, folders: makeFolders())
 
         let missingURL = tempDir.appendingPathComponent("nope.m4a")
         do {
             _ = try await useCase.execute(fileURL: missingURL)
-            XCTFail("Expected import to fail for missing file")
+            Issue.record("Expected import to fail for missing file")
         } catch {
-            XCTAssertTrue(error is ImportError)
+            #expect(error is ImportError)
         }
     }
 }

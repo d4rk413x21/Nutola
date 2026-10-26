@@ -1,17 +1,18 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class StoreTests: XCTestCase {
+final class StoreTests {
     var tmp: URL!
     var archive: MeetingArchive!
 
-    override func setUp() {
+    init() {
         tmp = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-tests-\(UUID().uuidString)")
         archive = MeetingArchive(root: tmp)
     }
 
-    override func tearDown() {
+    deinit {
         try? FileManager.default.removeItem(at: tmp)
     }
 
@@ -29,37 +30,37 @@ final class StoreTests: XCTestCase {
         return m
     }
 
-    func testSaveRefusesToResurrectDeletedMeeting() throws {
+    @Test func testSaveRefusesToResurrectDeletedMeeting() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.delete(id: m.id)
         // A late pipeline write must not recreate the deleted meeting on disk.
-        XCTAssertThrowsError(try archive.save(m))
-        XCTAssertNil(archive.meeting(id: m.id))
+        #expect(throws: (any Error).self) { try archive.save(m) }
+        #expect(archive.meeting(id: m.id) == nil)
     }
 
-    func testMeetingRoundTrip() throws {
+    @Test func testMeetingRoundTrip() throws {
         let m = makeMeeting()
         try archive.save(m)
-        XCTAssertEqual(archive.meeting(id: m.id), m)
-        XCTAssertEqual(archive.allMeetings(), [m])
+        #expect(archive.meeting(id: m.id) == m)
+        #expect(archive.allMeetings() == [m])
     }
 
-    func testReadsExistingISODatesWithAndWithoutFractionalSeconds() throws {
+    @Test func testReadsExistingISODatesWithAndWithoutFractionalSeconds() throws {
         let meeting = makeMeeting()
         try archive.save(meeting)
         let file = archive.folder(for: meeting.id).appendingPathComponent("meeting.json")
-        var data = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        var data = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
         for (text, expected) in [("2023-11-14T22:13:20.123Z", 1_700_000_000.123),
                                  ("2023-11-14T22:13:20Z", 1_700_000_000.0)] {
             data["createdAt"] = text
             try JSONSerialization.data(withJSONObject: data).write(to: file)
-            let loaded = try XCTUnwrap(archive.meeting(id: meeting.id))
-            XCTAssertEqual(loaded.createdAt.timeIntervalSince1970, expected, accuracy: 0.001)
+            let loaded = try #require(archive.meeting(id: meeting.id))
+            #expect(abs((loaded.createdAt.timeIntervalSince1970) - (expected)) <= 0.001)
         }
     }
 
-    func testTranscriptRoundTrip() throws {
+    @Test func testTranscriptRoundTrip() throws {
         let m = makeMeeting()
         try archive.save(m)
         let segments = [
@@ -67,25 +68,25 @@ final class StoreTests: XCTestCase {
             TranscriptSegment(speakerID: "s1", start: 3, end: 6, text: "Hey! Ready to start?"),
         ]
         try archive.saveTranscript(segments, for: m.id)
-        XCTAssertEqual(archive.transcript(for: m.id), segments)
+        #expect(archive.transcript(for: m.id) == segments)
     }
 
-    func testDevelopmentDraftsRoundTripWithoutChangingMeetingNotes() throws {
+    @Test func testDevelopmentDraftsRoundTripWithoutChangingMeetingNotes() throws {
         let meeting = makeMeeting()
         try archive.save(meeting)
         try archive.saveSummary("Existing notes", for: meeting.id)
-        XCTAssertNil(try archive.developmentTasks(for: meeting.id))
+        #expect(try archive.developmentTasks(for: meeting.id) == nil)
         let evidence = [TranscriptSegment(speakerID: "me", start: 2, end: 3, text: "Fix login.")]
         let review = DevelopmentTaskReview(
             transcriptFingerprint: try DevelopmentTaskReview.fingerprint(evidence),
             tasks: [DevelopmentTaskDraft(title: "Fix login", detail: "Handle expired tokens.", evidence: evidence)])
         try archive.saveDevelopmentTasks(review, for: meeting.id)
-        XCTAssertEqual(try archive.developmentTasks(for: meeting.id), review)
-        XCTAssertEqual(archive.summary(for: meeting.id), "Existing notes")
-        XCTAssertEqual(archive.meeting(id: meeting.id), meeting)
+        #expect(try archive.developmentTasks(for: meeting.id) == review)
+        #expect(archive.summary(for: meeting.id) == "Existing notes")
+        #expect(archive.meeting(id: meeting.id) == meeting)
     }
 
-    func testStaleDevelopmentDraftWritesCannotEraseLinearCheckpoints() throws {
+    @Test func testStaleDevelopmentDraftWritesCannotEraseLinearCheckpoints() throws {
         let meeting = makeMeeting()
         try archive.save(meeting)
         let draft = DevelopmentTaskDraft(title: "Fix login", detail: "Handle expired tokens.", evidence: [])
@@ -95,79 +96,79 @@ final class StoreTests: XCTestCase {
         linked.tasks[0].linearExport = LinearIssueExport(id: draft.id, workspaceID: "workspace", teamID: "team",
             identifier: "DEV-12", url: URL(string: "https://linear.app/work/issue/DEV-12/task")!)
         try archive.saveDevelopmentTasks(linked, for: meeting.id, replacing: original)
-        XCTAssertThrowsError(try archive.saveDevelopmentTasks(original, for: meeting.id, replacing: original))
-        XCTAssertEqual(try archive.developmentTasks(for: meeting.id), linked)
+        #expect(throws: (any Error).self) { try archive.saveDevelopmentTasks(original, for: meeting.id, replacing: original) }
+        #expect(try archive.developmentTasks(for: meeting.id) == linked)
     }
 
-    func testDevelopmentDraftsCannotResurrectDeletedMeetings() throws {
+    @Test func testDevelopmentDraftsCannotResurrectDeletedMeetings() throws {
         let meeting = makeMeeting()
         try archive.save(meeting)
         try archive.delete(id: meeting.id)
-        XCTAssertThrowsError(try archive.saveDevelopmentTasks(DevelopmentTaskReview(), for: meeting.id))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: archive.folder(for: meeting.id).path))
+        #expect(throws: (any Error).self) { try archive.saveDevelopmentTasks(DevelopmentTaskReview(), for: meeting.id) }
+        #expect(!(FileManager.default.fileExists(atPath: archive.folder(for: meeting.id).path)))
     }
 
-    func testCorruptDevelopmentDraftsAreReportedInsteadOfDiscarded() throws {
+    @Test func testCorruptDevelopmentDraftsAreReportedInsteadOfDiscarded() throws {
         let meeting = makeMeeting()
         try archive.save(meeting)
         let file = archive.folder(for: meeting.id).appendingPathComponent("development-tasks.json")
         try Data("invalid json".utf8).write(to: file)
-        XCTAssertThrowsError(try archive.developmentTasks(for: meeting.id))
-        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), "invalid json")
+        #expect(throws: (any Error).self) { try archive.developmentTasks(for: meeting.id) }
+        #expect(try String(contentsOf: file, encoding: .utf8) == "invalid json")
     }
 
-    func testSummaryRoundTrip() throws {
+    @Test func testSummaryRoundTrip() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.saveSummary("## TL;DR\nShipped it.", for: m.id)
-        XCTAssertEqual(archive.summary(for: m.id), "## TL;DR\nShipped it.")
+        #expect(archive.summary(for: m.id) == "## TL;DR\nShipped it.")
     }
 
     // MARK: - Summary edit history
 
-    func testSaveSummarySnapshotsPreviousVersion() throws {
+    @Test func testSaveSummarySnapshotsPreviousVersion() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.saveSummary("v1", for: m.id)
-        XCTAssertEqual(archive.summaryHistory(for: m.id), [])
+        #expect(archive.summaryHistory(for: m.id) == [])
         // Overwriting with different content creates a snapshot of v1.
         try archive.saveSummary("v2", for: m.id)
         let history = archive.summaryHistory(for: m.id)
-        XCTAssertEqual(history.count, 1)
-        XCTAssertEqual(history[0].markdown, "v1")
-        XCTAssertEqual(archive.summary(for: m.id), "v2")
+        #expect(history.count == 1)
+        #expect(history[0].markdown == "v1")
+        #expect(archive.summary(for: m.id) == "v2")
     }
 
-    func testSaveSummaryDoesNotSnapshotIdenticalContent() throws {
+    @Test func testSaveSummaryDoesNotSnapshotIdenticalContent() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.saveSummary("same", for: m.id)
         try archive.saveSummary("same", for: m.id)
-        XCTAssertEqual(archive.summaryHistory(for: m.id), [])
+        #expect(archive.summaryHistory(for: m.id) == [])
     }
 
-    func testSaveSummaryDoesNotSnapshotEmptyToContent() throws {
+    @Test func testSaveSummaryDoesNotSnapshotEmptyToContent() throws {
         let m = makeMeeting()
         try archive.save(m)
         // First write from empty → no snapshot (not an edit).
         try archive.saveSummary("first real summary", for: m.id)
-        XCTAssertEqual(archive.summaryHistory(for: m.id), [])
+        #expect(archive.summaryHistory(for: m.id) == [])
     }
 
-    func testHistoryIsNewestFirst() throws {
+    @Test func testHistoryIsNewestFirst() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.saveSummary("v1", for: m.id)
         try archive.saveSummary("v2", for: m.id)
         try archive.saveSummary("v3", for: m.id)
         let history = archive.summaryHistory(for: m.id)
-        XCTAssertEqual(history.count, 2)
+        #expect(history.count == 2)
         // Newest snapshot first: v2 was displaced by v3, v1 by v2.
-        XCTAssertEqual(history[0].markdown, "v2")
-        XCTAssertEqual(history[1].markdown, "v1")
+        #expect(history[0].markdown == "v2")
+        #expect(history[1].markdown == "v1")
     }
 
-    func testHistoryPrunesToMax() throws {
+    @Test func testHistoryPrunesToMax() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.saveSummary("v0", for: m.id)
@@ -176,32 +177,32 @@ final class StoreTests: XCTestCase {
             try archive.saveSummary("v\(i)", for: m.id)
         }
         let history = archive.summaryHistory(for: m.id)
-        XCTAssertEqual(history.count, MeetingArchive.maxSummaryHistory)
+        #expect(history.count == MeetingArchive.maxSummaryHistory)
     }
 
-    func testRestoreSummarySwapsCurrentAndIsReversible() throws {
+    @Test func testRestoreSummarySwapsCurrentAndIsReversible() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.saveSummary("v1", for: m.id)
         try archive.saveSummary("v2", for: m.id)
         let v1Snapshot = archive.summaryHistory(for: m.id).first { $0.markdown == "v1" }!
         // Restore v1: current "v2" becomes a snapshot, summary becomes v1.
-        XCTAssertTrue(archive.restoreSummary(at: v1Snapshot.timestamp, for: m.id))
-        XCTAssertEqual(archive.summary(for: m.id), "v1")
+        #expect(archive.restoreSummary(at: v1Snapshot.timestamp, for: m.id))
+        #expect(archive.summary(for: m.id) == "v1")
         // v2 is now in history, so the restore is reversible.
         let v2Snapshot = archive.summaryHistory(for: m.id).first { $0.markdown == "v2" }!
-        XCTAssertTrue(archive.restoreSummary(at: v2Snapshot.timestamp, for: m.id))
-        XCTAssertEqual(archive.summary(for: m.id), "v2")
+        #expect(archive.restoreSummary(at: v2Snapshot.timestamp, for: m.id))
+        #expect(archive.summary(for: m.id) == "v2")
     }
 
-    func testRestoreSummaryUnknownTimestampFails() throws {
+    @Test func testRestoreSummaryUnknownTimestampFails() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.saveSummary("v1", for: m.id)
-        XCTAssertFalse(archive.restoreSummary(at: Date(timeIntervalSince1970: 0), for: m.id))
+        #expect(!(archive.restoreSummary(at: Date(timeIntervalSince1970: 0), for: m.id)))
     }
 
-    func testSummaryTimestampsAdvancePastSavedHistoryAfterReopening() throws {
+    @Test func testSummaryTimestampsAdvancePastSavedHistoryAfterReopening() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.saveSummary("v1", for: m.id)
@@ -211,50 +212,49 @@ final class StoreTests: XCTestCase {
         let futureMS: Int64 = 4_102_444_800_000
         try Data("v0".utf8).write(to: edits.appendingPathComponent("summary-\(futureMS)-AAAA.md"))
         try archive.saveSummary("v2", for: m.id)
-        XCTAssertEqual(archive.summaryHistory(for: m.id).first?.markdown, "v1")
+        #expect(archive.summaryHistory(for: m.id).first?.markdown == "v1")
 
         archive = MeetingArchive(root: tmp)
         try archive.saveSummary("v3", for: m.id)
         let history = archive.summaryHistory(for: m.id)
-        XCTAssertEqual(history.map(\.markdown), ["v2", "v1", "v0"])
-        XCTAssertEqual(Set(history.map(\.timestamp)).count, history.count)
-        XCTAssertGreaterThan(try XCTUnwrap(history.first).timestamp.timeIntervalSince1970,
-                             TimeInterval(futureMS) / 1000)
-        let v1 = try XCTUnwrap(history.first { $0.markdown == "v1" })
-        XCTAssertTrue(archive.restoreSummary(at: v1.timestamp, for: m.id))
-        XCTAssertEqual(archive.summary(for: m.id), "v1")
-        let v3 = try XCTUnwrap(archive.summaryHistory(for: m.id).first { $0.markdown == "v3" })
-        XCTAssertTrue(archive.restoreSummary(at: v3.timestamp, for: m.id))
-        XCTAssertEqual(archive.summary(for: m.id), "v3")
+        #expect(history.map(\.markdown) == ["v2", "v1", "v0"])
+        #expect(Set(history.map(\.timestamp)).count == history.count)
+        #expect(try #require(history.first).timestamp.timeIntervalSince1970 > TimeInterval(futureMS) / 1000)
+        let v1 = try #require(history.first { $0.markdown == "v1" })
+        #expect(archive.restoreSummary(at: v1.timestamp, for: m.id))
+        #expect(archive.summary(for: m.id) == "v1")
+        let v3 = try #require(archive.summaryHistory(for: m.id).first { $0.markdown == "v3" })
+        #expect(archive.restoreSummary(at: v3.timestamp, for: m.id))
+        #expect(archive.summary(for: m.id) == "v3")
     }
 
-    func testDeleteMeetingRemovesHistory() throws {
+    @Test func testDeleteMeetingRemovesHistory() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.saveSummary("v1", for: m.id)
         try archive.saveSummary("v2", for: m.id)
-        XCTAssertFalse(archive.summaryHistory(for: m.id).isEmpty)
+        #expect(!(archive.summaryHistory(for: m.id).isEmpty))
         try archive.delete(id: m.id)
-        XCTAssertEqual(archive.summaryHistory(for: m.id), [])
+        #expect(archive.summaryHistory(for: m.id) == [])
     }
 
-    func testSideNotesRoundTrip() throws {
+    @Test func testSideNotesRoundTrip() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.saveSideNotes("- Action: follow up with design\n- Blocker: API latency", for: m.id)
-        XCTAssertEqual(archive.sideNotes(for: m.id), "- Action: follow up with design\n- Blocker: API latency")
-        XCTAssertEqual(archive.summary(for: m.id), "")
+        #expect(archive.sideNotes(for: m.id) == "- Action: follow up with design\n- Blocker: API latency")
+        #expect(archive.summary(for: m.id) == "")
     }
 
-    func testDelete() throws {
+    @Test func testDelete() throws {
         let m = makeMeeting()
         try archive.save(m)
         try archive.delete(id: m.id)
-        XCTAssertNil(archive.meeting(id: m.id))
-        XCTAssertEqual(archive.allMeetings(), [])
+        #expect(archive.meeting(id: m.id) == nil)
+        #expect(archive.allMeetings() == [])
     }
 
-    func testSearchRanksTitleAboveTranscript() throws {
+    @Test func testSearchRanksTitleAboveTranscript() throws {
         let titled = makeMeeting(title: "Budget review")
         try archive.save(titled)
         var other = makeMeeting(title: "Standup")
@@ -265,13 +265,13 @@ final class StoreTests: XCTestCase {
             for: other.id
         )
         let hits = archive.search("budget")
-        XCTAssertEqual(hits.count, 2)
-        XCTAssertEqual(hits[0].meeting.id, titled.id)
-        XCTAssertEqual(hits[1].meeting.id, other.id)
-        XCTAssertTrue(hits[1].excerpts[0].contains("Me @ 0:00"))
+        #expect(hits.count == 2)
+        #expect(hits[0].meeting.id == titled.id)
+        #expect(hits[1].meeting.id == other.id)
+        #expect(hits[1].excerpts[0].contains("Me @ 0:00"))
     }
 
-    func testSearchSkipsTranscriptDecodeForNonMatchingMeetings() throws {
+    @Test func testSearchSkipsTranscriptDecodeForNonMatchingMeetings() throws {
         // A meeting whose transcript can't contain the query word should still
         // be scored correctly (0 from transcript) and skipped at the JSON-decode
         // level — the pre-filter must not suppress title/summary/attendee hits.
@@ -283,12 +283,12 @@ final class StoreTests: XCTestCase {
         )
         // Title match only — transcript pre-filter skips the decode, score comes from title.
         let hits = archive.search("sprint")
-        XCTAssertEqual(hits.count, 1)
-        XCTAssertEqual(hits[0].meeting.id, m.id)
-        XCTAssertEqual(hits[0].score, 10) // title only, no transcript contribution
+        #expect(hits.count == 1)
+        #expect(hits[0].meeting.id == m.id)
+        #expect(hits[0].score == 10) // title only, no transcript contribution
     }
 
-    func testSearchPreFilterStillFindsTranscriptMatches() throws {
+    @Test func testSearchPreFilterStillFindsTranscriptMatches() throws {
         // Verify the pre-filter doesn't false-negative on real transcript hits.
         let m = makeMeeting(title: "Random title")
         try archive.save(m)
@@ -297,53 +297,53 @@ final class StoreTests: XCTestCase {
             for: m.id
         )
         let hits = archive.search("migration")
-        XCTAssertEqual(hits.count, 1)
-        XCTAssertTrue(hits[0].excerpts.contains(where: { $0.contains("migration") }))
+        #expect(hits.count == 1)
+        #expect(hits[0].excerpts.contains(where: { $0.contains("migration") }))
     }
 
-    func testSearchNoResults() {
-        XCTAssertTrue(archive.search("zebra").isEmpty)
-        XCTAssertTrue(archive.search("   ").isEmpty)
+    @Test func testSearchNoResults() {
+        #expect(archive.search("zebra").isEmpty)
+        #expect(archive.search("   ").isEmpty)
     }
 
     // MARK: - Error paths (#76, #78)
 
-    func testSaveSummaryThrowsWhenFolderDeleted() throws {
+    @Test func testSaveSummaryThrowsWhenFolderDeleted() throws {
         // A late pipeline write to a meeting the user deleted mid-run must
         // surface the failure (the folder is gone) instead of silently recreating it.
         let m = makeMeeting()
         try archive.save(m)
         try archive.saveSummary("first", for: m.id)
         try archive.delete(id: m.id)
-        XCTAssertThrowsError(try archive.saveSummary("second", for: m.id))
-        XCTAssertEqual(archive.summary(for: m.id), "")
+        #expect(throws: (any Error).self) { try archive.saveSummary("second", for: m.id) }
+        #expect(archive.summary(for: m.id) == "")
     }
 
-    func testDeleteWhenFolderMissing() throws {
+    @Test func testDeleteWhenFolderMissing() throws {
         // delete(id:) must not throw when the meeting folder was already removed
         // (e.g. user trashed it from Finder). Removing twice should be idempotent.
         let m = makeMeeting()
         try archive.save(m)
         try archive.delete(id: m.id)
-        XCTAssertNil(archive.meeting(id: m.id))
+        #expect(archive.meeting(id: m.id) == nil)
         // Second delete — folder is already gone.
-        XCTAssertNoThrow(try archive.delete(id: m.id))
+        #expect(throws: Never.self) { try archive.delete(id: m.id) }
     }
 
     // MARK: - Unicode / emoji round-trip (#77)
 
-    func testSummaryRoundTripUnicode() throws {
+    @Test func testSummaryRoundTripUnicode() throws {
         let m = makeMeeting()
         try archive.save(m)
         // Emoji + combining marks + non-BMP (U+1F600) + CJK + RTL Hebrew.
         let unicode = "## 🎉 Q4 review — café naïve — שָׁלוֹם — 日本語"
         try archive.saveSummary(unicode, for: m.id)
-        XCTAssertEqual(archive.summary(for: m.id), unicode)
+        #expect(archive.summary(for: m.id) == unicode)
     }
 
     // MARK: - Sorting (#79)
 
-    func testAllMeetingsSortedDescending() throws {
+    @Test func testAllMeetingsSortedDescending() throws {
         // allMeetings() returns newest createdAt first (descending).
         var oldest = makeMeeting()
         oldest.createdAt = Date(timeIntervalSince1970: 1_000)
@@ -355,45 +355,45 @@ final class StoreTests: XCTestCase {
         newest.createdAt = Date(timeIntervalSince1970: 3_000)
         try archive.save(newest)
         let all = archive.allMeetings()
-        XCTAssertEqual(all.count, 3)
-        XCTAssertEqual(all.map(\.id), [newest.id, middle.id, oldest.id])
+        #expect(all.count == 3)
+        #expect(all.map(\.id) == [newest.id, middle.id, oldest.id])
     }
 
     // MARK: - Search edge cases (#80)
 
-    func testSearchWithEmptyQuery() {
+    @Test func testSearchWithEmptyQuery() {
         // An empty query has no words to match — returns no hits rather than
         // matching every meeting.
         let m = makeMeeting(title: "Standup")
         try? archive.save(m)
-        XCTAssertTrue(archive.search("").isEmpty)
+        #expect(archive.search("").isEmpty)
     }
 
-    func testSearchWithWhitespaceQuery() {
+    @Test func testSearchWithWhitespaceQuery() {
         // Whitespace-only collapses to no words, same as empty.
         let m = makeMeeting(title: "Standup")
         try? archive.save(m)
-        XCTAssertTrue(archive.search("   \t  ").isEmpty)
-        XCTAssertTrue(archive.search("\n\n").isEmpty)
+        #expect(archive.search("   \t  ").isEmpty)
+        #expect(archive.search("\n\n").isEmpty)
     }
 
     // MARK: - Zoom roster (#90)
 
-    func testZoomRosterRoundTrip() throws {
+    @Test func testZoomRosterRoundTrip() throws {
         let m = makeMeeting()
         try archive.save(m)
         let roster = ["Alice Rivera", "Bob Chen", "桂 太郎"]
         archive.saveZoomRoster(roster, for: m.id)
-        XCTAssertEqual(archive.zoomRoster(for: m.id), roster)
+        #expect(archive.zoomRoster(for: m.id) == roster)
         // Empty roster round-trips too (writes an empty array, not a deletion).
         archive.saveZoomRoster([], for: m.id)
-        XCTAssertEqual(archive.zoomRoster(for: m.id), [])
+        #expect(archive.zoomRoster(for: m.id) == [])
     }
 
     // MARK: - bulkRenameSpeakers (cross-meeting rename / merge)
 
     @MainActor
-    func testBulkRenameAcrossMeetings() throws {
+    @Test func testBulkRenameAcrossMeetings() throws {
         let store = MeetingStore(archive: archive)
         var m1 = makeMeeting(title: "M1")
         var m2 = makeMeeting(title: "M2")
@@ -406,15 +406,15 @@ final class StoreTests: XCTestCase {
         store.reload()
 
         let touched = store.bulkRenameSpeakers(from: "Gui Lima", to: "Guilherme Lima")
-        XCTAssertEqual(touched, 2)
+        #expect(touched == 2)
         let after1 = store.meeting(id: m1.id)!
         let after2 = store.meeting(id: m2.id)!
-        XCTAssertEqual(after1.speakers.first { $0.id == "s1" }?.name, "Guilherme Lima")
-        XCTAssertEqual(after2.speakers.first { $0.id == "s2" }?.name, "Guilherme Lima")
+        #expect(after1.speakers.first { $0.id == "s1" }?.name == "Guilherme Lima")
+        #expect(after2.speakers.first { $0.id == "s2" }?.name == "Guilherme Lima")
     }
 
     @MainActor
-    func testBulkRenameIsCaseInsensitiveAndWhitespaceTolerant() throws {
+    @Test func testBulkRenameIsCaseInsensitiveAndWhitespaceTolerant() throws {
         let store = MeetingStore(archive: archive)
         var m1 = makeMeeting(title: "M1")
         m1.speakers = [Speaker(id: "me", name: "Me", isMe: true), Speaker(id: "s1", name: "Gui  Lima ")]
@@ -422,12 +422,12 @@ final class StoreTests: XCTestCase {
         store.reload()
 
         let touched = store.bulkRenameSpeakers(from: "gui lima", to: "Guilherme Lima")
-        XCTAssertEqual(touched, 1)
-        XCTAssertEqual(store.meeting(id: m1.id)!.speakers.first { $0.id == "s1" }?.name, "Guilherme Lima")
+        #expect(touched == 1)
+        #expect(store.meeting(id: m1.id)!.speakers.first { $0.id == "s1" }?.name == "Guilherme Lima")
     }
 
     @MainActor
-    func testBulkRenameNoOpForSameName() throws {
+    @Test func testBulkRenameNoOpForSameName() throws {
         let store = MeetingStore(archive: archive)
         var m1 = makeMeeting(title: "M1")
         m1.speakers = [Speaker(id: "me", name: "Me", isMe: true), Speaker(id: "s1", name: "Alice")]
@@ -435,13 +435,13 @@ final class StoreTests: XCTestCase {
         store.reload()
 
         // "alice" → "Alice" should still rename (different display strings).
-        XCTAssertEqual(store.bulkRenameSpeakers(from: "alice", to: "Alice"), 1)
+        #expect(store.bulkRenameSpeakers(from: "alice", to: "Alice") == 1)
         // "Alice" → "Alice" should be a no-op.
-        XCTAssertEqual(store.bulkRenameSpeakers(from: "Alice", to: "Alice"), 0)
+        #expect(store.bulkRenameSpeakers(from: "Alice", to: "Alice") == 0)
     }
 
     @MainActor
-    func testBulkRenameOnlyTouchesMatchingMeetings() throws {
+    @Test func testBulkRenameOnlyTouchesMatchingMeetings() throws {
         let store = MeetingStore(archive: archive)
         var m1 = makeMeeting(title: "M1")
         var m2 = makeMeeting(title: "M2")
@@ -452,9 +452,9 @@ final class StoreTests: XCTestCase {
         store.reload()
 
         let touched = store.bulkRenameSpeakers(from: "Bob", to: "Robert")
-        XCTAssertEqual(touched, 1)
-        XCTAssertEqual(store.meeting(id: m1.id)!.speakers.first { $0.id == "s1" }?.name, "Robert")
+        #expect(touched == 1)
+        #expect(store.meeting(id: m1.id)!.speakers.first { $0.id == "s1" }?.name == "Robert")
         // M2 untouched.
-        XCTAssertEqual(store.meeting(id: m2.id)!.speakers.first { $0.id == "s1" }?.name, "Carol")
+        #expect(store.meeting(id: m2.id)!.speakers.first { $0.id == "s1" }?.name == "Carol")
     }
 }

@@ -1,31 +1,32 @@
 import AVFoundation
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class LiveTranscriberTests: XCTestCase {
-    func testAudioCopyOwnsItsSamplesBeforeTransfer() throws {
-        let format = try XCTUnwrap(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
-        let source = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 2))
+struct LiveTranscriberTests {
+    @Test func testAudioCopyOwnsItsSamplesBeforeTransfer() throws {
+        let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2))
+        let source = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 2))
         source.frameLength = 2
-        let samples = try XCTUnwrap(source.floatChannelData)
+        let samples = try #require(source.floatChannelData)
         samples[0][0] = 0.25
         samples[0][1] = 0.5
         samples[1][0] = -0.25
         samples[1][1] = -0.5
 
-        let copy = try XCTUnwrap(LiveTranscriber.copy(source))
+        let copy = try #require(LiveTranscriber.copy(source))
         samples[0][0] = 1
         samples[1][1] = 1
-        let copied = try XCTUnwrap(copy.floatChannelData)
-        XCTAssertEqual(copy.frameLength, 2)
-        XCTAssertEqual(copy.format, source.format)
-        XCTAssertEqual(copied[0][0], 0.25)
-        XCTAssertEqual(copied[0][1], 0.5)
-        XCTAssertEqual(copied[1][0], -0.25)
-        XCTAssertEqual(copied[1][1], -0.5)
+        let copied = try #require(copy.floatChannelData)
+        #expect(copy.frameLength == 2)
+        #expect(copy.format == source.format)
+        #expect(copied[0][0] == 0.25)
+        #expect(copied[0][1] == 0.5)
+        #expect(copied[1][0] == -0.25)
+        #expect(copied[1][1] == -0.5)
     }
 
-    func testTurnsGroupConsecutiveSameSpeaker() {
+    @Test func testTurnsGroupConsecutiveSameSpeaker() {
         let segments = [
             TranscriptSegment(speakerID: "me", start: 0, end: 0, text: "Hi"),
             TranscriptSegment(speakerID: "me", start: 1, end: 1, text: "there"),
@@ -33,24 +34,24 @@ final class LiveTranscriberTests: XCTestCase {
             TranscriptSegment(speakerID: "me", start: 3, end: 3, text: "again"),
         ]
         let turns = LiveTranscriber.turns(from: segments)
-        XCTAssertEqual(turns.count, 3)
-        XCTAssertEqual(turns[0].speakerID, "me")
-        XCTAssertEqual(turns[0].text, "Hi there")
-        XCTAssertEqual(turns[1].speakerID, "them")
-        XCTAssertEqual(turns[1].text, "Hello")
-        XCTAssertEqual(turns[2].text, "again")
+        #expect(turns.count == 3)
+        #expect(turns[0].speakerID == "me")
+        #expect(turns[0].text == "Hi there")
+        #expect(turns[1].speakerID == "them")
+        #expect(turns[1].text == "Hello")
+        #expect(turns[2].text == "again")
         // Ids are the running index, so ForEach stays stable as segments append.
-        XCTAssertEqual(turns.map(\.id), [0, 1, 2])
+        #expect(turns.map(\.id) == [0, 1, 2])
     }
 
-    func testTurnsEmpty() {
-        XCTAssertTrue(LiveTranscriber.turns(from: []).isEmpty)
+    @Test func testTurnsEmpty() {
+        #expect(LiveTranscriber.turns(from: []).isEmpty)
     }
 
-    func testNameMapsSyntheticSpeakers() {
-        XCTAssertEqual(LiveTranscriber.name(for: LiveTranscriber.youSpeakerID), "You")
-        XCTAssertEqual(LiveTranscriber.name(for: LiveTranscriber.othersSpeakerID), "Others")
-        XCTAssertEqual(LiveTranscriber.name(for: "unmapped"), "unmapped")
+    @Test func testNameMapsSyntheticSpeakers() {
+        #expect(LiveTranscriber.name(for: LiveTranscriber.youSpeakerID) == "You")
+        #expect(LiveTranscriber.name(for: LiveTranscriber.othersSpeakerID) == "Others")
+        #expect(LiveTranscriber.name(for: "unmapped") == "unmapped")
     }
 
     // MARK: - Live echo dedup
@@ -64,17 +65,17 @@ final class LiveTranscriberTests: XCTestCase {
             around: anchor, in: &segments, window: LiveTranscriber.liveEchoWindow)
     }
 
-    func testDropsLiveMicEchoWhenSystemArrivesFirst() {
+    @Test func testDropsLiveMicEchoWhenSystemArrivesFirst() {
         // The far end's clean copy finalized first; the mic echo lands right after.
         var segments = [
             seg("them", 5.0, "let's lock the launch date"),
             seg("me", 5.2, "let's lock the launch date"),
         ]
         dedup(&segments, around: 5.2)
-        XCTAssertEqual(segments.map(\.speakerID), ["them"])
+        #expect(segments.map(\.speakerID) == ["them"])
     }
 
-    func testDropsLiveMicEchoRetroactivelyWhenSystemArrivesLast() {
+    @Test func testDropsLiveMicEchoRetroactivelyWhenSystemArrivesLast() {
         // The mic echo finalized first; the clean system copy lands a beat later and
         // should still remove it. The pass is bidirectional.
         var segments = [
@@ -82,37 +83,37 @@ final class LiveTranscriberTests: XCTestCase {
             seg("them", 5.3, "let's lock the launch date"),
         ]
         dedup(&segments, around: 5.3)
-        XCTAssertEqual(segments.map(\.speakerID), ["them"])
+        #expect(segments.map(\.speakerID) == ["them"])
     }
 
-    func testKeepsShortLiveMicBackchannel() {
+    @Test func testKeepsShortLiveMicBackchannel() {
         // A brief affirmation that happens to echo shouldn't be nuked.
         var segments = [seg("them", 3.0, "yeah"), seg("me", 3.2, "yeah")]
         dedup(&segments, around: 3.2)
-        XCTAssertEqual(segments.map(\.speakerID), ["them", "me"])
+        #expect(segments.map(\.speakerID) == ["them", "me"])
     }
 
-    func testKeepsGenuineLiveMicSpeech() {
+    @Test func testKeepsGenuineLiveMicSpeech() {
         var segments = [
             seg("them", 5.0, "how is the roadmap looking"),
             seg("me", 6.0, "sounds good to me here"),
         ]
         dedup(&segments, around: 6.0)
-        XCTAssertEqual(segments.count, 2)
-        XCTAssertTrue(segments.contains { $0.speakerID == "me" })
+        #expect(segments.count == 2)
+        #expect(segments.contains { $0.speakerID == "me" })
     }
 
-    func testEchoDedupIgnoresSegmentsOutsideWindow() {
+    @Test func testEchoDedupIgnoresSegmentsOutsideWindow() {
         // A matching system line 15s earlier is a different utterance, not an echo.
         var segments = [
             seg("them", 5.0, "let's lock the launch date"),
             seg("me", 20.0, "let's lock the launch date"),
         ]
         dedup(&segments, around: 20.0)
-        XCTAssertEqual(segments.count, 2, "the old system line is out of window, so no echo match")
+        #expect(segments.count == 2, "the old system line is out of window, so no echo match")
     }
 
-    func testKeepsGenuineMicLineThatMerelySharesVocabulary() {
+    @Test func testKeepsGenuineMicLineThatMerelySharesVocabulary() {
         // A genuine local line that reuses a few of the far end's words (0.6 coverage)
         // must NOT be dropped — only near-verbatim echoes (>=0.75) are.
         var segments = [
@@ -120,10 +121,10 @@ final class LiveTranscriberTests: XCTestCase {
             seg("me", 8.5, "lock in the date then"),   // 3/5 words overlap = 0.6
         ]
         dedup(&segments, around: 8.5)
-        XCTAssertTrue(segments.contains { $0.speakerID == "me" }, "coincidental vocabulary overlap kept")
+        #expect(segments.contains { $0.speakerID == "me" }, "coincidental vocabulary overlap kept")
     }
 
-    func testEchoDedupKeepsGenuineMicLineWithinWindowOfEcho() {
+    @Test func testEchoDedupKeepsGenuineMicLineWithinWindowOfEcho() {
         // Within one window: an echo plus a genuine local line. Only the echo drops.
         var segments = [
             seg("them", 5.0, "let's lock the launch date"),
@@ -132,70 +133,70 @@ final class LiveTranscriberTests: XCTestCase {
         ]
         dedup(&segments, around: 5.2)
         let meTexts = segments.filter { $0.speakerID == "me" }.map(\.text)
-        XCTAssertEqual(meTexts, ["works for everyone on our side"])
+        #expect(meTexts == ["works for everyone on our side"])
     }
 
-    func testHeadphoneBleedRemovesMicNearOthersWithSharedVocabulary() {
+    @Test func testHeadphoneBleedRemovesMicNearOthersWithSharedVocabulary() {
         var segments = [
             seg("me", 80.0, "and then repeat Jesus and more words here"),
             seg("them", 80.5, "you speak and then repeat Jesus and then English"),
         ]
         LiveTranscriber.removeHeadphoneBleedMic(
             around: 80.5, othersText: segments[1].text, in: &segments, window: 3.0)
-        XCTAssertEqual(segments.map(\.speakerID), ["them"])
+        #expect(segments.map(\.speakerID) == ["them"])
     }
 
-    func testSpeakerphoneEchoMatchesRemoteTextWithoutHeadphones() {
+    @Test func testSpeakerphoneEchoMatchesRemoteTextWithoutHeadphones() {
         let local = seg("me", 100.4, "dobbiamo aggiornare i dati delle statistiche")
         let remote = seg("them", 100.0, "Dobbiamo aggiornare i dati delle statistiche")
-        XCTAssertTrue(LiveTranscriber.isPlaybackEcho(local, among: [remote]))
+        #expect(LiveTranscriber.isPlaybackEcho(local, among: [remote]))
     }
 
-    func testSpeakerphoneEchoMatchesNamedRemoteSpeaker() {
+    @Test func testSpeakerphoneEchoMatchesNamedRemoteSpeaker() {
         let local = seg("me", 120.2, "bisogna aggiornare la procedura al più presto")
         let remote = seg("Giulia", 121.3, "bisogna aggiornare la procedura al più presto")
-        XCTAssertTrue(LiveTranscriber.isPlaybackEcho(local, among: [remote]))
+        #expect(LiveTranscriber.isPlaybackEcho(local, among: [remote]))
     }
 
-    func testSpeakerphoneEchoMatchesSplitRemoteSentences() {
+    @Test func testSpeakerphoneEchoMatchesSplitRemoteSentences() {
         let local = seg("me", 155, "dobbiamo completare la migrazione dello storage")
         let remote = [
             seg("them", 154, "dobbiamo completare la migrazione"),
             seg("them", 156, "dello storage")
         ]
-        XCTAssertTrue(LiveTranscriber.isPlaybackEcho(local, among: remote))
+        #expect(LiveTranscriber.isPlaybackEcho(local, among: remote))
     }
 
-    func testSpeakerphoneEchoPreservesRealLocalInterruption() {
+    @Test func testSpeakerphoneEchoPreservesRealLocalInterruption() {
         let local = seg("me", 50.2, "no la modifica va fatta dopo il rilascio")
         let remote = seg("them", 50, "la migrazione dello storage è pronta")
-        XCTAssertFalse(LiveTranscriber.isPlaybackEcho(local, among: [remote]))
+        #expect(!(LiveTranscriber.isPlaybackEcho(local, among: [remote])))
     }
 
-    func testSpeakerphoneEchoDoesNotDeleteDifferentConversation() {
+    @Test func testSpeakerphoneEchoDoesNotDeleteDifferentConversation() {
         let local = seg("me", 90, "dobbiamo completare la migrazione dello storage")
         let remote = seg("them", 80, "dobbiamo completare la migrazione dello storage")
-        XCTAssertFalse(LiveTranscriber.isPlaybackEcho(local, among: [remote]))
+        #expect(!(LiveTranscriber.isPlaybackEcho(local, among: [remote])))
     }
 
-    func testUnverifiedMicrophoneVolatileHiddenOnlyDuringPlayback() {
+    @Test func testUnverifiedMicrophoneVolatileHiddenOnlyDuringPlayback() {
         let texts = ["me": "parlo io", "them": "parlano gli altri"]
         let masked = LiveTranscriber.formattedVolatile(texts, suppressUnverifiedMic: true)
-        XCTAssertFalse(masked.contains("parlo io"))
-        XCTAssertTrue(masked.contains("parlano gli altri"))
-        XCTAssertTrue(LiveTranscriber.formattedVolatile(texts).contains("parlo io"))
+        #expect(!(masked.contains("parlo io")))
+        #expect(masked.contains("parlano gli altri"))
+        #expect(LiveTranscriber.formattedVolatile(texts).contains("parlo io"))
     }
 
-    func testFormattedVolatileLabelsChannels() {
+    @Test func testFormattedVolatileLabelsChannels() {
         let text = LiveTranscriber.formattedVolatile([
             LiveTranscriber.youSpeakerID: "hello",
             LiveTranscriber.othersSpeakerID: "hi there",
         ])
-        XCTAssertTrue(text.contains("You: hello"))
-        XCTAssertTrue(text.contains("Others: hi there"))
+        #expect(text.contains("You: hello"))
+        #expect(text.contains("Others: hi there"))
     }
 
-    func testRemoteSpeechPeakThreshold() {
-        XCTAssertGreaterThan(LiveTranscriber.remoteSpeechPeakThreshold, 0.01)
+    @Test func testRemoteSpeechPeakThreshold() {
+        #expect(LiveTranscriber.remoteSpeechPeakThreshold > 0.01)
     }
 }

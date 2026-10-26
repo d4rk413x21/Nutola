@@ -1,19 +1,17 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class ArchivedEventStoreTests: XCTestCase {
+final class ArchivedEventStoreTests {
     private var defaults: UserDefaults!
     private let suiteName = "test-archived-events-\(UUID().uuidString)"
 
-    override func setUp() {
-        super.setUp()
+    init() {
         defaults = UserDefaults(suiteName: suiteName)!
     }
 
-    override func tearDown() {
+    deinit {
         defaults.removePersistentDomain(forName: suiteName)
-        defaults = nil
-        super.tearDown()
     }
 
     private func makeStore() -> ArchivedEventStore {
@@ -26,113 +24,113 @@ final class ArchivedEventStoreTests: XCTestCase {
 
     // MARK: - Title (series) archiving
 
-    func testArchiveTitle() {
+    @Test func testArchiveTitle() {
         let store = makeStore()
         store.archiveTitle("Lunch time")
-        XCTAssertTrue(store.isTitleArchived("Lunch time"))
-        XCTAssertFalse(store.isTitleArchived("Standup"))
+        #expect(store.isTitleArchived("Lunch time"))
+        #expect(!(store.isTitleArchived("Standup")))
     }
 
-    func testArchiveTitleTrimsWhitespace() {
+    @Test func testArchiveTitleTrimsWhitespace() {
         let store = makeStore()
         store.archiveTitle("  Lunch time  ")
-        XCTAssertTrue(store.isTitleArchived("Lunch time"))
+        #expect(store.isTitleArchived("Lunch time"))
     }
 
-    func testArchiveEmptyTitleIsNoOp() {
+    @Test func testArchiveEmptyTitleIsNoOp() {
         let store = makeStore()
         store.archiveTitle("   ")
-        XCTAssertTrue(store.archivedTitles.isEmpty)
+        #expect(store.archivedTitles.isEmpty)
     }
 
-    func testUnarchiveTitle() {
+    @Test func testUnarchiveTitle() {
         let store = makeStore()
         store.archiveTitle("Lunch time")
         store.unarchiveTitle("Lunch time")
-        XCTAssertFalse(store.isTitleArchived("Lunch time"))
+        #expect(!(store.isTitleArchived("Lunch time")))
     }
 
     // MARK: - Event ID archiving
 
-    func testArchiveEventByID() {
+    @Test func testArchiveEventByID() {
         let store = makeStore()
         let id = UUID().uuidString
         store.archiveEvent(id: id, title: "Test Event")
-        XCTAssertTrue(store.isEventArchived(id: id))
-        XCTAssertFalse(store.isEventArchived(id: "other"))
+        #expect(store.isEventArchived(id: id))
+        #expect(!(store.isEventArchived(id: "other")))
     }
 
-    func testUnarchiveEventByID() {
+    @Test func testUnarchiveEventByID() {
         let store = makeStore()
         let id = UUID().uuidString
         store.archiveEvent(id: id, title: "Test Event")
         store.unarchiveEvent(id: id)
-        XCTAssertFalse(store.isEventArchived(id: id))
+        #expect(!(store.isEventArchived(id: id)))
     }
 
     // MARK: - Combined filtering
 
-    func testIsArchivedByTitle() {
+    @Test func testIsArchivedByTitle() {
         let store = makeStore()
         store.archiveTitle("Lunch time")
-        XCTAssertTrue(store.isArchived(title: "Lunch time", eventID: "abc"))
+        #expect(store.isArchived(title: "Lunch time", eventID: "abc"))
     }
 
-    func testIsArchivedByEventID() {
+    @Test func testIsArchivedByEventID() {
         let store = makeStore()
         store.archiveEvent(id: "evt-123", title: "Some Event")
-        XCTAssertTrue(store.isArchived(title: "Other", eventID: "evt-123"))
+        #expect(store.isArchived(title: "Other", eventID: "evt-123"))
     }
 
-    func testIsNotArchivedWhenNeitherMatches() {
+    @Test func testIsNotArchivedWhenNeitherMatches() {
         let store = makeStore()
-        XCTAssertFalse(store.isArchived(title: "Lunch time", eventID: "abc"))
+        #expect(!(store.isArchived(title: "Lunch time", eventID: "abc")))
     }
 
     // MARK: - Clear all
 
-    func testClearAll() {
+    @Test func testClearAll() {
         let store = makeStore()
         store.archiveTitle("Lunch time")
         store.archiveEvent(id: "evt-123", title: "Some Event")
         store.clearAll()
-        XCTAssertTrue(store.archivedTitles.isEmpty)
-        XCTAssertTrue(store.archivedEvents.isEmpty)
-        XCTAssertFalse(store.isArchived(title: "Lunch time", eventID: "evt-123"))
+        #expect(store.archivedTitles.isEmpty)
+        #expect(store.archivedEvents.isEmpty)
+        #expect(!(store.isArchived(title: "Lunch time", eventID: "evt-123")))
     }
 
     // MARK: - Persistence
 
-    func testTitlesPersistAcrossInstances() {
+    @Test func testTitlesPersistAcrossInstances() {
         let store1 = makeStore()
         store1.archiveTitle("Standup")
 
         let store2 = makeStore()
-        XCTAssertTrue(store2.isTitleArchived("Standup"))
+        #expect(store2.isTitleArchived("Standup"))
     }
 
-    func testEventIDsPersistAcrossInstances() {
+    @Test func testEventIDsPersistAcrossInstances() {
         let store1 = makeStore()
         store1.archiveEvent(id: "evt-456", title: "Persisted Event")
 
         let store2 = makeStore()
-        XCTAssertTrue(store2.isEventArchived(id: "evt-456"))
+        #expect(store2.isEventArchived(id: "evt-456"))
     }
 
     // MARK: - Multiple
 
-    func testMultipleTitlesArchived() {
+    @Test func testMultipleTitlesArchived() {
         let store = makeStore()
         store.archiveTitle("Lunch time")
         store.archiveTitle("Standup")
         store.archiveTitle("1:1")
-        XCTAssertEqual(store.archivedTitles.count, 3)
+        #expect(store.archivedTitles.count == 3)
     }
 
-    func testDuplicateTitleIsIdempotent() {
+    @Test func testDuplicateTitleIsIdempotent() {
         let store = makeStore()
         store.archiveTitle("Lunch time")
         store.archiveTitle("Lunch time")
-        XCTAssertEqual(store.archivedTitles.count, 1)
+        #expect(store.archivedTitles.count == 1)
     }
 }

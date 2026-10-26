@@ -1,13 +1,14 @@
-import XCTest
+import Foundation
+import Testing
 @testable import Nutola
 
-final class MeetingCommandServiceTests: XCTestCase {
+final class MeetingCommandServiceTests {
     private var root: URL!
     private var archive: MeetingArchive!
     private var service: MeetingCommandService!
     private var meeting: Meeting!
 
-    override func setUpWithError() throws {
+    init() throws {
         root = FileManager.default.temporaryDirectory
             .appendingPathComponent("nutola-meeting-reads-\(UUID().uuidString)")
         archive = MeetingArchive(root: root)
@@ -30,11 +31,11 @@ final class MeetingCommandServiceTests: XCTestCase {
         meeting = value
     }
 
-    override func tearDown() {
+    deinit {
         try? FileManager.default.removeItem(at: root)
     }
 
-    func testListPreservesDescriptionAndPagination() throws {
+    @Test func testListPreservesDescriptionAndPagination() throws {
         var older = Meeting(title: "Older sync", createdAt: Date(timeIntervalSince1970: 1_600_000_000))
         older.state = .ready
         try archive.createFolder(for: older.id)
@@ -42,45 +43,49 @@ final class MeetingCommandServiceTests: XCTestCase {
 
         let page = service.list(limit: 1, offset: 0)
 
-        XCTAssertTrue(page.contains("[\(meeting.id.uuidString)] Roadmap sync"))
-        XCTAssertTrue(page.contains("next_offset: 1"))
-        XCTAssertEqual(service.list(limit: 1, offset: 2), "No more meetings (offset 2 ≥ 2).")
+        #expect(page.contains("[\(meeting.id.uuidString)] Roadmap sync"))
+        #expect(page.contains("next_offset: 1"))
+        #expect(service.list(limit: 1, offset: 2) == "No more meetings (offset 2 ≥ 2).")
     }
 
-    func testSearchPreservesExcerpts() throws {
+    @Test func testSearchPreservesExcerpts() throws {
         let result = try service.search(query: "march launch", limit: 1, offset: 0)
 
-        XCTAssertTrue(result.contains("Roadmap sync"))
-        XCTAssertTrue(result.contains("Priya @ 0:12: Let's move launch to March."))
-        XCTAssertEqual(try service.search(query: "missing", limit: 20, offset: 0),
-                       "No meetings matched \"missing\".")
+        #expect(result.contains("Roadmap sync"))
+        #expect(result.contains("Priya @ 0:12: Let's move launch to March."))
+        #expect(try service.search(query: "missing", limit: 20, offset: 0) == "No meetings matched \"missing\".")
     }
 
-    func testShowIncludesMetadataSummaryAttendeesAndSpeakers() throws {
+    @Test func testShowIncludesMetadataSummaryAttendeesAndSpeakers() throws {
         let result = try service.show(id: meeting.id.uuidString)
 
-        XCTAssertTrue(result.contains("Attendees: Priya, Taylor"))
-        XCTAssertTrue(result.contains("Speakers: Me, Priya"))
-        XCTAssertTrue(result.contains("Launch moved to March."))
+        #expect(result.contains("Attendees: Priya, Taylor"))
+        #expect(result.contains("Speakers: Me, Priya"))
+        #expect(result.contains("Launch moved to March."))
     }
 
-    func testTranscriptUsesStoredSpeakerNamesAndTimestamps() throws {
-        XCTAssertEqual(try service.transcript(id: meeting.id.uuidString),
-                       "# Roadmap sync\n\nPriya @ 0:12: Let's move launch to March.")
+    @Test func testTranscriptUsesStoredSpeakerNamesAndTimestamps() throws {
+        #expect(try service.transcript(id: meeting.id.uuidString) == "# Roadmap sync\n\nPriya @ 0:12: Let's move launch to March.")
     }
 
-    func testLookupRejectsMalformedAndMissingIDs() {
-        XCTAssertThrowsError(try service.show(id: "not-a-uuid")) { error in
-            XCTAssertEqual(error.localizedDescription, "'id' must be a meeting UUID")
+    @Test func testLookupRejectsMalformedAndMissingIDs() {
+        do {
+            _ = try service.show(id: "not-a-uuid")
+            Issue.record("Expected an error")
+        } catch {
+            #expect(error.localizedDescription == "'id' must be a meeting UUID")
         }
 
         let missing = UUID().uuidString
-        XCTAssertThrowsError(try service.transcript(id: missing)) { error in
-            XCTAssertEqual(error.localizedDescription, "No meeting with id \(missing)")
+        do {
+            _ = try service.transcript(id: missing)
+            Issue.record("Expected an error")
+        } catch {
+            #expect(error.localizedDescription == "No meeting with id \(missing)")
         }
     }
 
-    func testLivePreservesDefaultAndWholeMeetingWindows() throws {
+    @Test func testLivePreservesDefaultAndWholeMeetingWindows() throws {
         var live = Meeting(title: "Live sync", createdAt: Date())
         live.state = .recording
         try archive.createFolder(for: live.id)
@@ -93,9 +98,9 @@ final class MeetingCommandServiceTests: XCTestCase {
         let recent = service.live(minutes: nil)
         let whole = service.live(minutes: 0)
 
-        XCTAssertFalse(recent.contains("Old context"))
-        XCTAssertTrue(recent.contains("Current context"))
-        XCTAssertTrue(whole.contains("Old context"))
-        XCTAssertTrue(whole.contains("Current context"))
+        #expect(!(recent.contains("Old context")))
+        #expect(recent.contains("Current context"))
+        #expect(whole.contains("Old context"))
+        #expect(whole.contains("Current context"))
     }
 }

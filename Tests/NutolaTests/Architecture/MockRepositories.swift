@@ -1,6 +1,5 @@
 import Foundation
 import UserNotifications
-import XCTest
 @testable import Nutola
 
 // MARK: - Meeting repository

@@ -70,6 +70,9 @@ final class MeetingArchive: @unchecked Sendable {
     /// Runs on `queue`. Returns `nil` when there's no transcript file.
     private func cachedTranscript(for id: UUID) -> [TranscriptSegment]? {
         let url = folder(for: id).appendingPathComponent("transcript.json")
+        if let pending = FilePersistence.failures[url] {
+            return try? decoder.decode([TranscriptSegment].self, from: pending.data)
+        }
         guard let mtime = try? FileManager.default
             .attributesOfItem(atPath: url.path)[.modificationDate] as? Date
         else {
@@ -138,7 +141,7 @@ final class MeetingArchive: @unchecked Sendable {
         let dirs = (try? FileManager.default.contentsOfDirectory(
             at: dir, includingPropertiesForKeys: nil)) ?? []
         return dirs.compactMap { dir in
-            guard let data = try? Data(contentsOf: dir.appendingPathComponent("meeting.json"))
+            guard let data = try? FilePersistence.read(dir.appendingPathComponent("meeting.json"))
             else { return nil }
             return try? decoder.decode(Meeting.self, from: data)
         }
@@ -147,7 +150,7 @@ final class MeetingArchive: @unchecked Sendable {
 
     func meeting(id: UUID) -> Meeting? {
         queue.sync {
-            guard let data = try? Data(contentsOf: folder(for: id).appendingPathComponent("meeting.json"))
+            guard let data = try? FilePersistence.read(folder(for: id).appendingPathComponent("meeting.json"))
             else { return nil }
             return try? decoder.decode(Meeting.self, from: data)
         }
@@ -156,6 +159,7 @@ final class MeetingArchive: @unchecked Sendable {
     enum ArchiveError: Error {
         case meetingDeleted
         case encodingFailed
+        case summaryChanged
     }
 
     /// The meeting folder is created once, at recording start. Refusing to
@@ -250,7 +254,7 @@ final class MeetingArchive: @unchecked Sendable {
 
     func liveTranscript(for id: UUID) -> [TranscriptSegment] {
         queue.sync {
-            guard let data = try? Data(contentsOf: liveTranscriptURL(for: id)) else { return [] }
+            guard let data = try? FilePersistence.read(liveTranscriptURL(for: id)) else { return [] }
             return (try? decoder.decode([TranscriptSegment].self, from: data)) ?? []
         }
     }
@@ -275,7 +279,7 @@ final class MeetingArchive: @unchecked Sendable {
 
     func platformSpeakerEvents(for id: UUID) -> [PlatformSpeakerEvent] {
         queue.sync {
-            guard let data = try? Data(contentsOf: platformSpeakerEventsURL(for: id)) else { return [] }
+            guard let data = try? FilePersistence.read(platformSpeakerEventsURL(for: id)) else { return [] }
             return (try? decoder.decode([PlatformSpeakerEvent].self, from: data)) ?? []
         }
     }
@@ -301,7 +305,7 @@ final class MeetingArchive: @unchecked Sendable {
 
     func zoomRoster(for id: UUID) -> [String] {
         queue.sync {
-            guard let data = try? Data(contentsOf: zoomRosterURL(for: id)) else { return [] }
+            guard let data = try? FilePersistence.read(zoomRosterURL(for: id)) else { return [] }
             return (try? decoder.decode([String].self, from: data)) ?? []
         }
     }
@@ -334,13 +338,18 @@ final class MeetingArchive: @unchecked Sendable {
 
     func summary(for id: UUID) -> String {
         queue.sync {
-            (try? String(contentsOf: folder(for: id).appendingPathComponent("summary.md"), encoding: .utf8)) ?? ""
+            let file = folder(for: id).appendingPathComponent("summary.md")
+            return (try? FilePersistence.read(file)).map { String(decoding: $0, as: UTF8.self) } ?? ""
         }
     }
 
-    func saveSummary(_ markdown: String, for id: UUID) throws {
+    func saveSummary(_ markdown: String, for id: UUID, replacing expected: String? = nil) throws {
         try queue.sync {
             let summaryURL = folder(for: id).appendingPathComponent("summary.md")
+            if let expected {
+                let current = (try? FilePersistence.read(summaryURL)).map { String(decoding: $0, as: UTF8.self) } ?? ""
+                guard current == expected else { throw ArchiveError.summaryChanged }
+            }
             // Snapshot the outgoing summary so edits are recoverable. Only when a
             // non-empty summary already exists — the first write (empty → content)
             // isn't an edit, and snapshotting it would store an empty file forever.
@@ -376,7 +385,11 @@ final class MeetingArchive: @unchecked Sendable {
         }
         // Restore identifies snapshots by timestamp, so every write must advance
         // even within one millisecond, after reopening, or if the clock moves back.
-        let latestEpochMS = (try? FileManager.default.contentsOfDirectory(atPath: dir.path))?
+        let pendingSnapshots = FilePersistence.failures.filter { $0.key.deletingLastPathComponent() == dir }
+        if pendingSnapshots.values.contains(where: { $0.data == Data(markdown.utf8) }) { return }
+        let names = ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [])
+            + pendingSnapshots.keys.map(\.lastPathComponent)
+        let latestEpochMS = names
             .filter { $0.hasPrefix("summary-") && $0.hasSuffix(".md") }
             .compactMap { Int64($0.dropFirst("summary-".count).split(separator: "-").first ?? "") }
             .max() ?? 0
@@ -481,7 +494,8 @@ final class MeetingArchive: @unchecked Sendable {
 
     func sideNotes(for id: UUID) -> String {
         queue.sync {
-            (try? String(contentsOf: folder(for: id).appendingPathComponent("notes.md"), encoding: .utf8)) ?? ""
+            (try? FilePersistence.read(folder(for: id).appendingPathComponent("notes.md")))
+                .map { String(decoding: $0, as: UTF8.self) } ?? ""
         }
     }
 

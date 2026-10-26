@@ -101,4 +101,39 @@ final class FilePersistenceTests: XCTestCase {
         store.add(text: "Invalid date", createdAt: Date(timeIntervalSince1970: .infinity))
         XCTAssertEqual(defaults.data(forKey: SettingsKey.taskTracker), previous)
     }
+
+    func testAutomaticSummaryCannotReplaceAPendingUserEdit() throws {
+        let archive = MeetingArchive(root: root)
+        let id = UUID()
+        try archive.createFolder(for: id)
+        try archive.saveSummary("Original", for: id)
+        let file = archive.folder(for: id).appendingPathComponent("summary.md")
+        try FileManager.default.removeItem(at: file)
+        try FileManager.default.createDirectory(at: file, withIntermediateDirectories: false)
+        XCTAssertThrowsError(try archive.saveSummary("User edits", for: id))
+        XCTAssertEqual(archive.summary(for: id), "User edits")
+        XCTAssertThrowsError(try archive.saveSummary("AI improvement", for: id, replacing: "Original")) { error in
+            guard case MeetingArchive.ArchiveError.summaryChanged = error else {
+                return XCTFail("Expected a concurrent edit conflict")
+            }
+        }
+        try FileManager.default.removeItem(at: file)
+        FilePersistence.retryAll()
+        XCTAssertEqual(archive.summary(for: id), "User edits")
+    }
+
+    func testTranscriptCacheDoesNotHidePendingEdits() throws {
+        let archive = MeetingArchive(root: root)
+        let id = UUID()
+        try archive.createFolder(for: id)
+        let original = [TranscriptSegment(speakerID: "me", start: 0, end: 1, text: "Original")]
+        try archive.saveTranscript(original, for: id)
+        XCTAssertEqual(archive.transcript(for: id), original)
+        let file = archive.folder(for: id).appendingPathComponent("transcript.json")
+        try FileManager.default.removeItem(at: file)
+        try FileManager.default.createDirectory(at: file, withIntermediateDirectories: false)
+        let edited = [TranscriptSegment(speakerID: "me", start: 0, end: 1, text: "Edited")]
+        XCTAssertThrowsError(try archive.saveTranscript(edited, for: id))
+        XCTAssertEqual(archive.transcript(for: id), edited)
+    }
 }

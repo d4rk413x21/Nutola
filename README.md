@@ -57,6 +57,10 @@ previous app preferences are imported without overwriting new preferences. The L
 must be entered again, and macOS may ask for recording or calendar permissions again.
 The meeting archive stays in the same location.
 
+If a file cannot be saved, Nutola keeps its latest contents in memory and shows a
+warning with **Retry saving**. Keep the app open until saving succeeds. Quitting
+without saving discards those pending contents.
+
 ## Privacy
 
 - Recording and transcription happen on your Mac; models may be downloaded when needed.

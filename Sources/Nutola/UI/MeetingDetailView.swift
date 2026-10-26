@@ -622,7 +622,13 @@ struct MeetingDetailView: View {
             // localization lands, wrap them in LocalizedStringKey.
             HStack {
                 Spacer()
-                Button("Cancel") { notesDraft = nil }
+                Button("Cancel") {
+                    let file = app.store.archive.folder(for: meeting.id).appendingPathComponent("summary.md")
+                    if let notesDraft, FilePersistence.failures[file]?.data == Data(notesDraft.utf8) {
+                        FilePersistence.discard(file)
+                    }
+                    notesDraft = nil
+                }
                     .keyboardShortcut(.cancelAction)
                 Button("Save") {
                     if let notesDraft, !app.store.saveSummarySafely(notesDraft, for: meeting.id) { return }

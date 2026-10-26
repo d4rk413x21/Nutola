@@ -100,6 +100,12 @@ struct TalkTimeDashboardView: View {
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(Theme.secondary(scheme))
             }
+            if let title = sourceMeetingTitle(summary) {
+                Text(title)
+                    .font(.nutola(10))
+                    .foregroundStyle(Theme.secondary(scheme))
+                    .lineLimit(1)
+            }
             percentageBar(summary)
             HStack(spacing: 8) {
                 Text(String(format: "%.0f%%", summary.percentageOfTotal))
@@ -204,8 +210,14 @@ struct TalkTimeDashboardView: View {
         return "\(s)s"
     }
 
+    private func sourceMeetingTitle(_ summary: SpeakerTalkTimeSummary) -> String? {
+        guard let id = summary.meetingID else { return nil }
+        return meetings.first { $0.id == id }?.title
+    }
+
     private func accessibilityLabel(for summary: SpeakerTalkTimeSummary) -> String {
         var parts = [summary.name, Self.format(hours: summary.totalTalkTime)]
+        if let title = sourceMeetingTitle(summary) { parts.append("From \(title)") }
         parts.append("\(summary.meetingCount) \(summary.meetingCount == 1 ? "meeting" : "meetings")")
         parts.append(String(format: "%.0f percent of total talk time", summary.percentageOfTotal))
         if summary.meetingCount > 1 {

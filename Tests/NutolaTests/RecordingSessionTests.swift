@@ -1,3 +1,4 @@
+import Synchronization
 import XCTest
 @testable import Nutola
 
@@ -58,16 +59,15 @@ final class RecordingSessionTests: XCTestCase {
         // it surfaces an error to a caller-supplied closure. RecordingSession
         // wires this in start(): mic.onRestartFailure = { ... micRestartError = ... }.
         let recorder = MicRecorder()
-        final class CapturedError { var message: String? }
-        let captured = CapturedError()
+        let captured = Mutex<String?>(nil)
         recorder.onRestartFailure = { error in
-            captured.message = error.localizedDescription
+            captured.withLock { $0 = error.localizedDescription }
         }
         struct FakeRestartError: Error, LocalizedError {
             var errorDescription: String? { "audio route changed" }
         }
         recorder.onRestartFailure?(FakeRestartError())
-        XCTAssertEqual(captured.message, "audio route changed",
+        XCTAssertEqual(captured.withLock { $0 }, "audio route changed",
                        "MicRecorder.onRestartFailure must deliver the error to the closure")
     }
 }

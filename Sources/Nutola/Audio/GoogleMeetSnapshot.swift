@@ -16,6 +16,10 @@ struct MeetAccessibilityNode: Codable, Sendable {
     var children: [MeetAccessibilityNode]? = nil
 
     var label: String { title ?? description ?? "" }
+    var isCaptionRegion: Bool {
+        subrole == "AXLandmarkRegion" && ["Sottotitoli", "Captions", "Closed captions"].contains(label)
+    }
+    var isParticipantList: Bool { role == "AXList" && ["Partecipanti", "Participants"].contains(label) }
     var staticTexts: [String] {
         if role == "AXStaticText", let value { return [value] }
         return (children ?? []).flatMap(\.staticTexts)
@@ -56,7 +60,7 @@ struct GoogleMeetSnapshot: Sendable {
             $0.role == "AXButton" && ["Esci dalla chiamata", "Leave call", "Leave the call"].contains($0.label)
         }) else { return nil }
 
-        let people = nodes.first { $0.role == "AXList" && ["Partecipanti", "Participants"].contains($0.label) }
+        let people = nodes.first(where: \.isParticipantList)
         let participants = people.map { list in
             (list.children ?? []).compactMap { row -> PlatformParticipant? in
                 guard row.role == "AXGroup", let name = validName(row.label) else { return nil }
@@ -65,9 +69,7 @@ struct GoogleMeetSnapshot: Sendable {
                 return PlatformParticipant(name: name, isLocal: local)
             }
         }
-        let region = nodes.first {
-            $0.subrole == "AXLandmarkRegion" && ["Sottotitoli", "Captions", "Closed captions"].contains($0.label)
-        }
+        let region = nodes.first(where: \.isCaptionRegion)
         let captions = (region?.children ?? []).enumerated().compactMap { index, row -> Caption? in
             let columns = row.children ?? []
             guard columns.count >= 2,

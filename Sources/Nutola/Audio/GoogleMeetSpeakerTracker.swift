@@ -63,7 +63,7 @@ final class GoogleMeetSpeakerTracker: PlatformSpeakerTracker {
         var participants: [PlatformParticipant] = []
         var lastPersist = Date.distantPast
         var lastReportedName: String?
-        var status: String? = "Open your Google Meet meeting in the selected Chrome tab."
+        var status: String?
     }
     private let state = Mutex(State())
     private let queue = DispatchQueue(label: "io.github.d4rk413x21.Nutola.google-meet")
@@ -115,7 +115,8 @@ final class GoogleMeetSpeakerTracker: PlatformSpeakerTracker {
     private var now: TimeInterval { elapsedOffset + Date().timeIntervalSince(startDate) }
 
     private func tick() {
-        let snapshot = GoogleMeetReader.scan()
+        let room = state.withLock { $0.timeline.roomCode }
+        let snapshot = GoogleMeetReader.scan(roomCode: room)
         let time = now
         let change = state.withLock { state -> (Bool, String?) in
             let accepted = state.timeline.observe(snapshot, at: time)
@@ -128,7 +129,8 @@ final class GoogleMeetSpeakerTracker: PlatformSpeakerTracker {
                 }
                 state.status = snapshot.captionsEnabled ? nil : "Turn on captions in Google Meet to identify speakers."
             } else {
-                state.status = "Keep the recorded Meet meeting selected in Chrome to identify speakers."
+                state.status = state.timeline.roomCode == nil ? nil
+                    : "Keep the recorded Meet meeting selected in Chrome to identify speakers."
             }
             let name = state.timeline.activeName(at: time)
             let changed = name != state.lastReportedName

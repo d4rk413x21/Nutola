@@ -38,9 +38,7 @@ enum SpeakerTrackingTarget: Sendable, Equatable {
     case googleMeetChrome
 }
 
-/// Chooses a speaker tracker for the detected source app. Returns a no-op
-/// tracker for platforms without an AX/caption reader, so `RecordingSession`
-/// always has *something* conforming and never nil-checks the platform.
+/// Creates the tracker for a supported meeting source.
 enum PlatformSpeakerTrackerFactory {
     @MainActor static func make(
         target: SpeakerTrackingTarget,
@@ -61,17 +59,4 @@ enum PlatformSpeakerTrackerFactory {
                                             startDate: startDate, elapsedOffset: elapsedOffset)
         }
     }
-}
-
-/// A no-op tracker for platforms Nutola can't read by AX yet. Conforms so
-/// `RecordingSession` treats every platform uniformly; `speakerAt` returns
-/// nil (so diarization owns attribution) and the roster stays empty.
-@MainActor
-final class NoopSpeakerTracker: PlatformSpeakerTracker {
-    var onActiveSpeaker: (@MainActor (String?) -> Void)?
-    var onLocalMuteChanged: (@MainActor (Bool) -> Void)?
-    nonisolated func speakerAt(_ elapsed: TimeInterval) -> String? { nil }
-    nonisolated func currentRoster() -> [String] { [] }
-    nonisolated func start() {}
-    nonisolated func stop() {}
 }

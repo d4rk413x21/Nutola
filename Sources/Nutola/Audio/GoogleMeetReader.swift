@@ -3,7 +3,7 @@ import ApplicationServices
 import Foundation
 
 enum GoogleMeetReader {
-    static func scan() -> GoogleMeetSnapshot? {
+    static func scan(roomCode expectedRoom: String? = nil) -> GoogleMeetSnapshot? {
         guard AccessibilityPermission.isTrusted,
               let app = NSRunningApplication.runningApplications(withBundleIdentifier: "com.google.Chrome").first else { return nil }
         let root = AXUIElementCreateApplication(app.processIdentifier)
@@ -27,18 +27,25 @@ enum GoogleMeetReader {
             return nil
         }
         guard let (webArea, code) = findMeeting(window, depth: 0) else { return nil }
+        guard expectedRoom == nil || expectedRoom == code else { return nil }
 
-        func snapshot(_ element: AXUIElement, depth: Int) -> MeetAccessibilityNode? {
+        func snapshot(_ element: AXUIElement, depth: Int, collectContent: Bool = false) -> MeetAccessibilityNode? {
             guard depth < 40, budget.visit() else { return nil }
-            // Page text is read only after its exact Meet host and room URL match.
-            return MeetAccessibilityNode(
+            var node = MeetAccessibilityNode(
                 role: string(element, "AXRole", budget: budget) ?? "",
                 subrole: string(element, "AXSubrole", budget: budget),
                 title: string(element, "AXTitle", budget: budget),
-                description: string(element, "AXDescription", budget: budget),
-                value: string(element, "AXValue", budget: budget),
-                identifier: String(CFHash(element)),
-                children: children(element, budget: budget).compactMap { snapshot($0, depth: depth + 1) })
+                description: string(element, "AXDescription", budget: budget))
+            let relevant = collectContent || node.isCaptionRegion || node.isParticipantList
+            // Only caption/participant values in the pinned room are needed, never chat text.
+            if relevant {
+                node.value = string(element, "AXValue", budget: budget)
+                node.identifier = String(CFHash(element))
+            }
+            node.children = children(element, budget: budget).compactMap {
+                snapshot($0, depth: depth + 1, collectContent: relevant)
+            }
+            return node
         }
         guard let tree = snapshot(webArea, depth: 0), !budget.exhausted else { return nil }
         return GoogleMeetSnapshot.parse(tree, roomCode: code)

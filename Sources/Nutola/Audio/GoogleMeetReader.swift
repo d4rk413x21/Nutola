@@ -9,6 +9,10 @@ enum GoogleMeetReader {
         let root = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(root, 0.1)
         let budget = ReadBudget()
+        if let enabled = attribute(root, "AXEnhancedUserInterface", budget: budget) as? Bool, !enabled {
+            // Chrome can apply this request even when the setter returns attributeUnsupported.
+            AXUIElementSetAttributeValue(root, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
+        }
         guard let value = attribute(root, "AXFocusedWindow", budget: budget),
               CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
         let window = value as! AXUIElement

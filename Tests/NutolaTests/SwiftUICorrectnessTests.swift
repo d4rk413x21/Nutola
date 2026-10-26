@@ -155,6 +155,23 @@ final class SwiftUICorrectnessTests: XCTestCase {
         XCTAssertEqual(store.meeting(id: second.id)?.speakers.first?.name, "Speaker 1")
     }
 
+    func testLargeArchiveTalkTimeAggregation() {
+        let meetings = (0..<100).map { Meeting(title: "Meeting \($0)", createdAt: .now) }
+        let speakers = [Speaker(id: "named", name: "Alice"), Speaker(id: "s1", name: "Speaker 1")]
+        let segments = (0..<1_000).map { index in
+            TranscriptSegment(speakerID: index.isMultiple(of: 2) ? "named" : "s1",
+                              start: Double(index), end: Double(index + 1), text: "Meeting words")
+        }
+        let transcripts = meetings.map { ($0.id, segments) }
+        let people = meetings.map { ($0.id, speakers) }
+        var summaries: [SpeakerTalkTimeSummary] = []
+        measure {
+            summaries = TalkTimeAggregator.aggregate(meetings: meetings, transcripts: transcripts, speakers: people)
+        }
+        XCTAssertEqual(summaries.count, 101)
+        XCTAssertEqual(summaries.first(where: { $0.name == "Alice" })?.totalTalkTime, 50_000)
+    }
+
     func testSummaryCacheHonorsExternalChangesAndPendingWrites() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("nutola-summary-cache-\(UUID())")
         defer { FilePersistence.discard(in: root); try? FileManager.default.removeItem(at: root) }

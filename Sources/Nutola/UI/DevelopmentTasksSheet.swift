@@ -384,11 +384,11 @@ struct DevelopmentTasksSheet: View {
                 guard try DevelopmentTaskReview.fingerprint(latest) == result.transcriptFingerprint else {
                     throw DevelopmentTaskError.transcriptChanged
                 }
-                try app.store.archive.saveDevelopmentTasks(result, for: meeting.id, replacing: expectedReview)
                 review = result
-                savedReview = result
                 currentFingerprint = result.transcriptFingerprint
                 selectedIDs = Set(result.tasks.map(\.id))
+                try app.store.archive.saveDevelopmentTasks(result, for: meeting.id, replacing: expectedReview)
+                savedReview = result
             } catch is CancellationError {
                 // Keep the saved drafts and the user's current edits.
             } catch {

@@ -940,6 +940,8 @@ struct LiveLocaleMenu: View {
     .menuStyle(.borderlessButton)
     .fixedSize()
     .help("Transcription language — pin to one locale or use Auto")
+    .accessibilityLabel("Transcription language")
+    .accessibilityValue(label)
   }
 
   private static func entries() -> [(id: String, label: String, locale: Locale)] {

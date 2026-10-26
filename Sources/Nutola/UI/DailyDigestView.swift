@@ -748,6 +748,7 @@ struct DailyDigestView: View {
                         .foregroundStyle(Theme.secondary(scheme))
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel(showPrepSection ? "Collapse meeting preparation" : "Expand meeting preparation")
             }
             if showPrepSection {
                 VStack(alignment: .leading, spacing: 8) {

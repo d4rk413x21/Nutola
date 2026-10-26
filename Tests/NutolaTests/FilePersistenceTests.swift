@@ -41,7 +41,7 @@ final class FilePersistenceTests: XCTestCase {
     @MainActor
     func testFailedSummarySaveDoesNotTriggerSuccessHook() throws {
         let archive = MeetingArchive(root: root)
-        let meeting = Meeting(title: "Planning")
+        let meeting = Meeting(title: "Planning", createdAt: .now)
         try archive.createFolder(for: meeting.id)
         try archive.save(meeting)
         let store = MeetingStore(archive: archive)

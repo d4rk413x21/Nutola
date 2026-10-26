@@ -441,6 +441,7 @@ struct AILauncherView: View {
                 .buttonStyle(.plain)
                 .disabled(!canSubmit)
                 .help(submitHelp)
+                .accessibilityLabel("Send question")
             }
         }
     }
@@ -884,6 +885,8 @@ private struct AskChatBubble: View {
         }
         .buttonStyle(.plain)
         .help(didCopy ? "Copied" : "Copy")
+        .accessibilityLabel("Copy message")
+        .accessibilityValue(didCopy ? "Copied" : "")
     }
 
     private func copyText() {

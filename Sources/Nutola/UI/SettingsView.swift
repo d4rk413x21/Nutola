@@ -1394,6 +1394,8 @@ struct StatusDot: View {
             .fill(color)
             .frame(width: 9, height: 9)
             .padding(.top, 3)
+            .accessibilityLabel("Status")
+            .accessibilityValue(ok.map { $0 ? "Available" : "Unavailable" } ?? "Not verified")
     }
 
     private var color: Color {

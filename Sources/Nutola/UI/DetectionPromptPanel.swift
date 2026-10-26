@@ -756,6 +756,11 @@ private struct RecordingPillPanelView: View {
     .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
     .overlay { PillHandleArea(onClick: { minimized.toggle() }) }
     .help(minimized ? "Expand live transcript" : "Minimize")
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Live recording")
+    .accessibilityAction(named: Text("Expand or minimize transcript")) { minimized.toggle() }
+    .focusable()
+    .onKeyPress(.return) { minimized.toggle(); return .handled }
   }
 }
 

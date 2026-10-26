@@ -244,6 +244,8 @@ final class MicRecorder: @unchecked Sendable {
     }
 
     private let lock = NSLock()
+    private var writeFailure = AudioWriteFailure()
+    var writeError: String? { lock.withLock { writeFailure.message } }
     private let restartQueue = DispatchQueue(label: "nutola.mic-recorder.restart")
     private var _levelHandler: (@Sendable ([Float]) -> Void)?
     private var _bufferSink: (@Sendable (AVAudioPCMBuffer) -> Void)?
@@ -282,6 +284,7 @@ final class MicRecorder: @unchecked Sendable {
         guard engine == nil else { throw MicRecorderError.alreadyRecording }
 
         captureStats = CaptureStats()
+        writeFailure = AudioWriteFailure()
         savedDefaultInputDevice = nil
         activeInputDeviceName = nil
         Self.logAudioDeviceSnapshot(context: "mic start")
@@ -666,7 +669,8 @@ final class MicRecorder: @unchecked Sendable {
     private func writeLocked(_ buffer: AVAudioPCMBuffer) {
         guard let file else { return }
         guard let converter else {
-            try? file.write(from: buffer)
+            do { try file.write(from: buffer) }
+            catch { writeFailure.record(error, source: "Microphone") }
             return
         }
         let ratio = file.processingFormat.sampleRate / buffer.format.sampleRate
@@ -687,7 +691,8 @@ final class MicRecorder: @unchecked Sendable {
             return buffer
         }
         if status != .error, out.frameLength > 0 {
-            try? file.write(from: out)
+            do { try file.write(from: out) }
+            catch { writeFailure.record(error, source: "Microphone") }
         }
     }
 

@@ -233,9 +233,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard alert.runModal() == .alertSecondButtonReturn else { return .terminateCancel }
                 discardUnsavedChanges = true
             }
-            AppState.shared.prepareForTermination()
-            if !discardUnsavedChanges && !FilePersistence.failures.isEmpty { return .terminateCancel }
-            return .terminateNow
+            let mayDiscard = discardUnsavedChanges
+            Task { @MainActor in
+                await AppState.shared.prepareForTermination()
+                sender.reply(toApplicationShouldTerminate: mayDiscard || FilePersistence.failures.isEmpty)
+            }
+            return .terminateLater
         }
     }
 }

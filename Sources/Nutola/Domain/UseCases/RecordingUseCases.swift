@@ -41,6 +41,9 @@ struct StopRecordingUseCase {
         guard let (session, meeting) = await recordingService.stop() else { return nil }
         var fresh = meetingRepository.meeting(id: meeting.id) ?? meeting
         fresh.duration = session.elapsed
+        if let notice = session.stopNotice {
+            fresh.notice = [fresh.notice, notice].compactMap { $0 }.joined(separator: " ")
+        }
         meetingRepository.upsert(fresh)
         await processMeeting.execute(fresh)
         return fresh

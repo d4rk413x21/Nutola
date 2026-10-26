@@ -608,7 +608,10 @@ final class RecordingSession: ObservableObject {
     NutolaConsoleLog.recording(
       "capture files mic=\(micBytes)B system=\(systemBytes)B micSignal=\(micHeard) systemSignal=\(systemSignal)"
     )
-    if micBytes == 0 && systemBytes == 0 {
+    let writeErrors = [mic.writeError, tap.writeError].compactMap { $0 }
+    if !writeErrors.isEmpty {
+      stopNotice = writeErrors.joined(separator: " ")
+    } else if micBytes == 0 && systemBytes == 0 {
       stopNotice = "No audio was captured — check your microphone and system audio settings"
       NutolaConsoleLog.recording("stop notice: no audio captured (both files empty)")
     } else {

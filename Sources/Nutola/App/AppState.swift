@@ -235,8 +235,8 @@ final class AppState: NSObject, ObservableObject {
       notice: meeting.notice)
   }
 
-  func prepareForTermination() {
-    container.recordingService.prepareForTermination(meetingRepository: store)
+  func prepareForTermination() async {
+    await container.recordingService.prepareForTermination(meetingRepository: store)
     session = nil
     recordingMeeting = nil
     updateInFlightCrashMirror()

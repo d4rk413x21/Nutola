@@ -136,4 +136,15 @@ final class FilePersistenceTests: XCTestCase {
         XCTAssertThrowsError(try archive.saveTranscript(edited, for: id))
         XCTAssertEqual(archive.transcript(for: id), edited)
     }
+
+    func testAudioWriteFailureKeepsTheFirstErrorForTheRecording() {
+        var failure = AudioWriteFailure()
+        failure.record(NSError(domain: "Disk", code: 1,
+                               userInfo: [NSLocalizedDescriptionKey: "Disk full"]), source: "Microphone")
+        let first = failure.message
+        failure.record(NSError(domain: "Disk", code: 2), source: "Microphone")
+        XCTAssertEqual(failure.message, first)
+        XCTAssertTrue(first?.contains("Disk full") == true)
+        XCTAssertTrue(first?.contains("Some audio may be missing") == true)
+    }
 }

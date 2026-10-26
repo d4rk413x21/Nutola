@@ -44,6 +44,8 @@ final class SystemAudioTap: @unchecked Sendable {
     }
 
     private(set) var captureStats = CaptureStats()
+    private var writeFailure = AudioWriteFailure()
+    var writeError: String? { ioQueue.sync { writeFailure.message } }
 
     /// Current IO callback count — read by the RecordingSession watchdog to
     /// detect a stalled tap (callbacks stopped but isRunning still true) and
@@ -386,7 +388,7 @@ final class SystemAudioTap: @unchecked Sendable {
                 try file.write(from: output)
             }
         } catch {
-            // Drop the buffer; a failing disk resurfaces when the file is finalized or read.
+            writeFailure.record(error, source: "System")
         }
     }
 
@@ -415,7 +417,11 @@ final class SystemAudioTap: @unchecked Sendable {
                     memset(channels[ch], 0, Int(frames) * MemoryLayout<Float>.size)
                 }
             }
-            try? file.write(from: buffer)
+            do { try file.write(from: buffer) }
+            catch {
+                writeFailure.record(error, source: "System")
+                return
+            }
             remaining -= Int(frames)
         }
     }

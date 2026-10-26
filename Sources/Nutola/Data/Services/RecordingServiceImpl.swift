@@ -245,16 +245,18 @@ final class RecordingServiceImpl: RecordingService {
     return (session, meeting)
   }
 
-  func prepareForTermination(meetingRepository: MeetingRepository) {
+  func prepareForTermination(meetingRepository: MeetingRepository) async {
     guard let session = currentSession, let meeting = recordingMeeting else { return }
-    NutolaConsoleLog.recording("app terminating — finalizing \(meeting.id.uuidString.prefix(8))")
-    session.stop()
-    if var fresh = meetingRepository.meeting(id: meeting.id) ?? recordingMeeting {
-      fresh.duration = session.elapsed
-      fresh.state = .processing
-      meetingRepository.upsert(fresh)
-    }
     clear()
+    NutolaConsoleLog.recording("app terminating — finalizing \(meeting.id.uuidString.prefix(8))")
+    await session.stopAsync()
+    var fresh = meetingRepository.meeting(id: meeting.id) ?? meeting
+    fresh.duration = session.elapsed
+    if let notice = session.stopNotice {
+      fresh.notice = [fresh.notice, notice].compactMap { $0 }.joined(separator: " ")
+    }
+    fresh.state = .processing
+    meetingRepository.upsert(fresh)
   }
 
   private func startSession(

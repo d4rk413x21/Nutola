@@ -35,7 +35,7 @@ protocol RecordingService: AnyObject {
     /// Processing must never start while .m4a files are still being written.
     func stop() async -> (session: RecordingSession, meeting: Meeting)?
     func discard() -> (session: RecordingSession, meeting: Meeting)?
-    func prepareForTermination(meetingRepository: MeetingRepository)
+    func prepareForTermination(meetingRepository: MeetingRepository) async
 }
 
 enum RecordingError: LocalizedError, Equatable {

@@ -214,7 +214,7 @@ final class MockRecordingService: RecordingService {
         return discardPair
     }
 
-    func prepareForTermination(meetingRepository: MeetingRepository) {
+    func prepareForTermination(meetingRepository: MeetingRepository) async {
         // Test-only termination: do not launch an unstructured async stop.
         clear()
     }

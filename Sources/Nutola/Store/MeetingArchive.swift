@@ -70,7 +70,7 @@ final class MeetingArchive: @unchecked Sendable {
     /// Runs on `queue`. Returns `nil` when there's no transcript file.
     private func cachedTranscript(for id: UUID) -> [TranscriptSegment]? {
         let url = folder(for: id).appendingPathComponent("transcript.json")
-        if let pending = FilePersistence.failures[url] {
+        if let pending = FilePersistence.failure(at: url) {
             return try? decoder.decode([TranscriptSegment].self, from: pending.data)
         }
         guard let mtime = try? FileManager.default
@@ -201,6 +201,7 @@ final class MeetingArchive: @unchecked Sendable {
 
     func saveTranscript(_ segments: [TranscriptSegment], for id: UUID) throws {
         try queue.sync {
+            guard FileManager.default.fileExists(atPath: folder(for: id).path) else { throw ArchiveError.meetingDeleted }
             let data = try encoder.encode(segments)
             try FilePersistence.write(data, to: folder(for: id).appendingPathComponent("transcript.json"))
             invalidateTranscriptCache(for: id)
@@ -345,6 +346,7 @@ final class MeetingArchive: @unchecked Sendable {
 
     func saveSummary(_ markdown: String, for id: UUID, replacing expected: String? = nil) throws {
         try queue.sync {
+            guard FileManager.default.fileExists(atPath: folder(for: id).path) else { throw ArchiveError.meetingDeleted }
             let summaryURL = folder(for: id).appendingPathComponent("summary.md")
             if let expected {
                 let current = (try? FilePersistence.read(summaryURL)).map { String(decoding: $0, as: UTF8.self) } ?? ""
@@ -501,6 +503,7 @@ final class MeetingArchive: @unchecked Sendable {
 
     func saveSideNotes(_ text: String, for id: UUID) throws {
         try queue.sync {
+            guard FileManager.default.fileExists(atPath: folder(for: id).path) else { throw ArchiveError.meetingDeleted }
             try FilePersistence.write(Data(text.utf8), to: folder(for: id).appendingPathComponent("notes.md"))
         }
     }

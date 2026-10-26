@@ -110,7 +110,7 @@ final class MeetingStore: ObservableObject {
 
     func sideNotes(for id: UUID) -> String {
         let file = archive.folder(for: id).appendingPathComponent("notes.md")
-        return FilePersistence.failures[file].map { String(decoding: $0.data, as: UTF8.self) }
+        return FilePersistence.failure(at: file).map { String(decoding: $0.data, as: UTF8.self) }
             ?? archive.sideNotes(for: id)
     }
 

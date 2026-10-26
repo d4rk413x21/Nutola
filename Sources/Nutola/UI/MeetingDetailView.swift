@@ -624,7 +624,7 @@ struct MeetingDetailView: View {
                 Spacer()
                 Button("Cancel") {
                     let file = app.store.archive.folder(for: meeting.id).appendingPathComponent("summary.md")
-                    if let notesDraft, FilePersistence.failures[file]?.data == Data(notesDraft.utf8) {
+                    if let notesDraft, FilePersistence.failure(at: file)?.data == Data(notesDraft.utf8) {
                         FilePersistence.discard(file)
                     }
                     notesDraft = nil

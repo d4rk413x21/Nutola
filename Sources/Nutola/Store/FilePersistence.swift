@@ -12,12 +12,19 @@ enum FilePersistence {
 
     static var failures: [URL: Failure] { pending.withLock { $0 } }
 
+    private static func key(_ url: URL) -> URL {
+        URL(fileURLWithPath: url.standardizedFileURL.path, isDirectory: false)
+    }
+
+    static func failure(at url: URL) -> Failure? { pending.withLock { $0[key(url)] } }
+
     static func read(_ url: URL) throws -> Data {
-        if let failure = pending.withLock({ $0[url] }) { return failure.data }
+        if let failure = failure(at: url) { return failure.data }
         return try Data(contentsOf: url)
     }
 
     static func write(_ data: Data, to url: URL) throws {
+        let url = key(url)
         var changed = false
         defer { if changed { Task { @MainActor in PersistenceStatus.shared.refresh() } } }
         try pending.withLock { files in
@@ -55,7 +62,7 @@ enum FilePersistence {
     }
 
     static func discard(_ url: URL) {
-        pending.withLock { $0[url] = nil }
+        pending.withLock { $0[key(url)] = nil }
         Task { @MainActor in PersistenceStatus.shared.refresh() }
     }
 }
@@ -67,6 +74,8 @@ final class PersistenceStatus: ObservableObject {
     @Published var operationError: String?
 
     nonisolated static func record(_ error: Error) {
+        // Failed file writes already publish their current state, including later recovery.
+        guard !FilePersistence.failures.values.contains(where: { $0.message == error.localizedDescription }) else { return }
         Task { @MainActor in shared.report(error) }
     }
 
@@ -89,8 +98,11 @@ struct PersistenceWarning: ViewModifier {
         content.safeAreaInset(edge: .bottom) {
             if !status.failures.isEmpty || status.operationError != nil {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Changes could not be saved", systemImage: "exclamationmark.triangle.fill")
-                    Text("Keep Nutola open. Unsaved file contents are held in memory until you retry.")
+                    Label(status.failures.isEmpty ? "File operation failed" : "Changes could not be saved",
+                          systemImage: "exclamationmark.triangle.fill")
+                    Text(status.failures.isEmpty
+                         ? "The operation did not finish. See Details, fix the problem and try the action again."
+                         : "Keep Nutola open. Unsaved file contents are held in memory. Free disk space or fix folder access, then retry.")
                         .font(.caption)
                     HStack {
                         Button("Retry saving") {

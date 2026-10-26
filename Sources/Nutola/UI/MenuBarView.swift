@@ -383,6 +383,9 @@ private struct RecordingCard: View {
             .buttonStyle(.plain)
             .disabled(onOpenMeeting == nil)
             .help(onOpenMeeting != nil ? "Open live transcript" : "")
+            if let notice = session.speakerTrackingNotice {
+                Text(notice).font(.caption).foregroundStyle(.secondary)
+            }
             HStack(alignment: .bottom) {
                 LevelMeter(levels: session.micBarLevels)
                 Spacer()

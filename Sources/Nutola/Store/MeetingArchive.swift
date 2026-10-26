@@ -300,6 +300,29 @@ final class MeetingArchive: @unchecked Sendable {
 
     // MARK: - Zoom roster snapshot (participants panel / video tiles)
 
+    /// Explicit local/remote identities from a browser meeting. Nil preserves legacy Zoom handling.
+    func platformParticipants(for id: UUID) -> [PlatformParticipant]? {
+        queue.sync {
+            let file = folder(for: id).appendingPathComponent("platform_participants.json")
+            guard let data = try? FilePersistence.read(file) else { return nil }
+            return try? decoder.decode([PlatformParticipant].self, from: data)
+        }
+    }
+
+    func savePlatformParticipants(_ participants: [PlatformParticipant], for id: UUID) {
+        queue.sync {
+            guard FileManager.default.fileExists(atPath: folder(for: id).path) else { return }
+            do {
+                try FilePersistence.write(encoder.encode(participants),
+                    to: folder(for: id).appendingPathComponent("platform_participants.json"))
+            } catch { PersistenceStatus.record(error) }
+        }
+    }
+
+    func removePlatformParticipants(for id: UUID) {
+        queue.sync { removeArtifact(folder(for: id).appendingPathComponent("platform_participants.json")) }
+    }
+
     func zoomRosterURL(for id: UUID) -> URL {
         folder(for: id).appendingPathComponent("zoom_roster.json")
     }

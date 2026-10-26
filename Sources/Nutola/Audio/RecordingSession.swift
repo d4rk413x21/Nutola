@@ -36,6 +36,7 @@ final class RecordingSession: ObservableObject {
   @Published private(set) var volatileText: String = ""
   /// Display name of whoever Zoom marks as the active remote speaker, when known.
   @Published private(set) var activeRemoteSpeaker: String?
+  @Published private(set) var speakerTrackingNotice: String?
   /// Zoom participant names captured at recording start, for the live UI.
   @Published private(set) var liveRoster: [String] = []
   /// Set when the mic engine failed to restart after an audio route change
@@ -65,10 +66,12 @@ final class RecordingSession: ObservableObject {
   /// `transcriptionLocale(forMeeting:)` from `TranscriptionLocaleStore` at start.
   private var transcriptionLocale: Locale?
   private var platformSpeakerTracker: PlatformSpeakerTracker?
-  /// Cached result of `shouldTrackZoomSpeakersAsync()`, set during
+  /// Cached result of `speakerTrackingTargetAsync()`, set during
   /// `startPostCaptureSetup` so `startupNotice` can answer without a
   /// synchronous AX scan on MainActor. Nil until the async scan lands.
-  private var zoomTrackingWanted: Bool?
+  private var platformTrackingWanted: Bool?
+  private var speakerTrackingTarget: SpeakerTrackingTarget?
+  private var stopped = false
   private var activeObserver: NSObjectProtocol?
   private var rosterTimer: Timer?
   private var systemSignalCheck: Task<Void, Never>?
@@ -342,20 +345,18 @@ final class RecordingSession: ObservableObject {
     // back to MainActor to wire callbacks and start polling.
     Task.detached { [weak self] in
       guard let self else { return }
-      let shouldTrack = await self.shouldTrackZoomSpeakersAsync()
+      let target = await self.speakerTrackingTargetAsync()
       await MainActor.run {
-        self.zoomTrackingWanted = shouldTrack
-        guard shouldTrack else { return }
-        NutolaConsoleLog.recording(
-          "Zoom speaker tracker \(AccessibilityPermission.isTrusted ? "starting" : "waiting for Accessibility")"
-        )
-        self.ensureZoomTracker()
+        guard !self.stopped else { return }
+        self.speakerTrackingTarget = target
+        self.platformTrackingWanted = target != nil
+        if target != nil { self.ensurePlatformTracker() }
         self.activeObserver = NotificationCenter.default.addObserver(
           forName: NSApplication.didBecomeActiveNotification,
           object: nil,
           queue: .main
         ) { [weak self] _ in
-          MainActor.assumeIsolated { self?.ensureZoomTrackerIfNeeded() }
+          MainActor.assumeIsolated { self?.ensurePlatformTrackerIfNeeded() }
         }
       }
     }
@@ -486,7 +487,7 @@ final class RecordingSession: ObservableObject {
       )
     case (false, false): break
     }
-    if (zoomTrackingWanted ?? Self.isZoom(sourceApp)), !AccessibilityPermission.isTrusted {
+    if (platformTrackingWanted ?? Self.isZoom(sourceApp)), !AccessibilityPermission.isTrusted {
       parts.append(
         "Enable Accessibility for Nutola in Privacy & Security to label Zoom speakers by name.")
     }
@@ -517,6 +518,8 @@ final class RecordingSession: ObservableObject {
 
   /// Synchronous teardown of timers, observers, trackers, and level meters.
   private func teardownRecorders() {
+    stopped = true
+    speakerTrackingNotice = nil
     NutolaConsoleLog.recording(
       "stop meeting=\(meetingID.uuidString.prefix(8)) elapsed=\(Int(elapsed))s liveSegments=\(liveSegments.count)"
     )
@@ -625,51 +628,50 @@ final class RecordingSession: ObservableObject {
 
   /// Async variant that runs the AX scan off MainActor. The fast path
   /// (Zoom source) returns immediately without a scan.
-  private func shouldTrackZoomSpeakersAsync() async -> Bool {
-    if Self.isZoom(sourceApp) { return true }
-    guard AccessibilityPermission.isTrusted else { return false }
-    let app = sourceApp
+  private func speakerTrackingTargetAsync() async -> SpeakerTrackingTarget? {
+    if MeetingDetector.isChromeMeetSource(sourceApp) { return .googleMeetChrome }
+    if Self.isZoom(sourceApp) { return .zoom }
+    guard sourceApp == nil || sourceApp?.isEmpty == true else { return nil }
+    guard AccessibilityPermission.isTrusted else { return nil }
     return await Task.detached(priority: .userInitiated) {
+      if GoogleMeetReader.scan() != nil { return SpeakerTrackingTarget.googleMeetChrome }
       let scan = ZoomActiveSpeakerReader.scan()
-      guard scan.zoomPID != nil, !scan.roster.isEmpty else { return false }
-      NutolaConsoleLog.zoom(
-        "inferred Zoom meeting from AX roster [\(scan.roster.joined(separator: ", "))] despite source=\(app ?? "manual")"
-      )
-      return true
+      return scan.zoomPID != nil && !scan.roster.isEmpty ? .zoom : nil
     }.value
   }
 
-  /// Starts (or resumes) the Zoom tracker once Accessibility trust is granted.
+  /// Starts the selected meeting tracker once Accessibility trust is granted.
   /// The caller MUST have already verified tracking is needed (via
-  /// `shouldTrackZoomSpeakersAsync`) — this does NOT re-scan, so it's safe to
+  /// `speakerTrackingTargetAsync`) — this does NOT re-scan, so it's safe to
   /// call on MainActor without blocking. The immediate initial roster is fetched
   /// asynchronously to avoid blocking MainActor on the tracker's serial queue
   /// (its `logInitialScan` runs a full AX walk on that queue).
-  private func ensureZoomTracker() {
+  private func ensurePlatformTracker() {
     if platformSpeakerTracker != nil {
-      NutolaConsoleLog.zoom("ensureZoomTracker — already running")
+      NutolaConsoleLog.recording("ensurePlatformTracker — already running")
       return
     }
-    NutolaConsoleLog.zoom(
-      "ensureZoomTracker — creating tracker accessibility=\(AccessibilityPermission.isTrusted)")
-    let tracker = PlatformSpeakerTrackerFactory.forApp(
-      bundleID: sourceApp,
+    NutolaConsoleLog.recording(
+      "ensurePlatformTracker — creating tracker accessibility=\(AccessibilityPermission.isTrusted)")
+    guard let target = speakerTrackingTarget, !stopped else { return }
+    let tracker = PlatformSpeakerTrackerFactory.make(
+      target: target,
       meetingID: meetingID,
       archive: archive,
       startDate: startedAt,
       elapsedOffset: elapsedOffset)
     tracker.onActiveSpeaker = { [weak self] name in
-      NutolaConsoleLog.zoom("UI activeRemoteSpeaker=\(name ?? "nil")")
+      NutolaConsoleLog.recording("UI activeRemoteSpeaker=\(name ?? "nil")")
       self?.activeRemoteSpeaker = name
     }
     tracker.onLocalMuteChanged = { [weak self] muted in
       guard let self else { return }
       self.micPaused = muted
       if muted {
-        NutolaConsoleLog.zoom("mic paused — local participant muted in Zoom")
+        NutolaConsoleLog.recording("mic paused — local participant muted in Zoom")
         self.mic.bufferSink = nil
       } else {
-        NutolaConsoleLog.zoom("mic resumed — local participant unmuted in Zoom")
+        NutolaConsoleLog.recording("mic resumed — local participant unmuted in Zoom")
         if let live = self.liveTranscriber {
           self.mic.bufferSink = { buffer in live.feedMic(buffer) }
         }
@@ -680,9 +682,10 @@ final class RecordingSession: ObservableObject {
       Task { @MainActor in
         guard let self, let tracker = self.platformSpeakerTracker else { return }
         let roster = tracker.currentRoster()
+        self.speakerTrackingNotice = tracker.statusMessage
         if roster != self.liveRoster {
           self.liveRoster = roster
-          NutolaConsoleLog.zoom("live roster updated: [\(roster.joined(separator: ", "))]")
+          NutolaConsoleLog.recording("live roster updated: [\(roster.joined(separator: ", "))]")
           self.updateLiveSpeakerNames(from: roster)
         }
       }
@@ -695,7 +698,7 @@ final class RecordingSession: ObservableObject {
       live.platformSpeakerResolver = { [weak tracker] t in
         tracker?.speakerAt(t)
       }
-      NutolaConsoleLog.zoom("platformSpeakerResolver wired to LiveTranscriber")
+      NutolaConsoleLog.recording("platformSpeakerResolver wired to LiveTranscriber")
     }
     platformSpeakerTracker = tracker
     tracker.start()
@@ -713,50 +716,53 @@ final class RecordingSession: ObservableObject {
         guard let self, !roster.isEmpty, roster != self.liveRoster else { return }
         self.liveRoster = roster
         self.updateLiveSpeakerNames(from: roster)
-        NutolaConsoleLog.zoom("initial roster: [\(roster.joined(separator: ", "))]")
+        NutolaConsoleLog.recording("initial roster: [\(roster.joined(separator: ", "))]")
       }
     }
   }
 
-  /// Called from `didBecomeActive` — re-checks async whether Zoom tracking is
+  /// Called from `didBecomeActive` — re-checks whether platform tracking is
   /// needed (the user may have just granted Accessibility, or a meeting may
   /// have started since the initial scan), then creates the tracker if so.
   /// Never blocks MainActor on an AX scan.
-  private func ensureZoomTrackerIfNeeded() {
-    if platformSpeakerTracker != nil { return }
-    Task.detached { [weak self] in
+  private func ensurePlatformTrackerIfNeeded() {
+    guard !stopped else { return }
+    if let tracker = platformSpeakerTracker {
+      if AccessibilityPermission.isTrusted { tracker.start() }
+      return
+    }
+    Task { [weak self] in
       guard let self else { return }
-      let shouldTrack = await self.shouldTrackZoomSpeakersAsync()
-      await MainActor.run {
-        self.zoomTrackingWanted = shouldTrack
-        guard shouldTrack else { return }
-        self.ensureZoomTracker()
-      }
+      let target = await self.speakerTrackingTargetAsync()
+      guard !self.stopped else { return }
+      self.speakerTrackingTarget = target
+      self.platformTrackingWanted = target != nil
+      if target != nil { self.ensurePlatformTracker() }
     }
   }
 
   /// Updates `LiveTranscriber.localSpeakerName` and `.remoteSpeakerName` from the
-  /// Zoom roster. The local participant is identified by matching NSFullUserName;
+  /// meeting roster. Meet uses explicit local markers; Zoom uses the existing account matcher.
   /// the remote name is the single non-local participant in a 1:1 call, or
   /// "Others" when there are multiple remote participants (until the active-speaker
   /// timeline can disambiguate them).
   private func updateLiveSpeakerNames(from roster: [String]) {
     let full = NSFullUserName().trimmingCharacters(in: .whitespacesAndNewlines)
     let localName =
-      roster.first(where: { ZoomActiveSpeakerReader.isLocalParticipant($0) })
+      roster.first(where: { platformSpeakerTracker?.isLocalParticipant($0) == true })
       ?? (full.isEmpty ? nil : full)
-    let remoteNames = roster.filter { !ZoomActiveSpeakerReader.isLocalParticipant($0) }
+    let remoteNames = roster.filter { platformSpeakerTracker?.isLocalParticipant($0) != true }
 
     if let localName, !localName.isEmpty {
       LiveTranscriber.localSpeakerName = localName
-      NutolaConsoleLog.zoom("local speaker name → \(localName)")
+      NutolaConsoleLog.recording("local speaker name → \(localName)")
     }
     // In a 1:1 call with one remote participant, use their name directly.
     // With multiple remotes, keep "Others" — the platform speaker resolver
     // handles per-segment attribution via active-speaker tracking.
-    if remoteNames.count == 1 {
+    if speakerTrackingTarget != .googleMeetChrome && remoteNames.count == 1 {
       LiveTranscriber.remoteSpeakerName = remoteNames[0]
-      NutolaConsoleLog.zoom("remote speaker name → \(remoteNames[0])")
+      NutolaConsoleLog.recording("remote speaker name → \(remoteNames[0])")
     } else {
       LiveTranscriber.remoteSpeakerName = "Others"
     }

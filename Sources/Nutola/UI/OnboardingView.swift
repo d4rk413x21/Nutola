@@ -137,8 +137,8 @@ struct OnboardingView: View {
             title: "Accessibility",
             required: false,
             detail: accessibilityTrusted
-                ? "Allowed — Nutola can read Zoom's active speaker to label who said what."
-                : "Labels Zoom speakers by name instead of Speaker 1 / Speaker 2.",
+                ? "Allowed — Nutola can read Zoom speakers and Google Meet captions in Chrome to label who said what."
+                : "Labels Zoom speakers and Google Meet captions in Chrome by name.",
             learnMore: accessibilityTrusted
                 ? nil
                 : "Click Grant, then enable Nutola under Privacy & Security → Accessibility.",

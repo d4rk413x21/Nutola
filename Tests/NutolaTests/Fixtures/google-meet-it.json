@@ -1,0 +1,149 @@
+{
+  "role": "AXWebArea",
+  "title": "Meet - abc-defg-hij",
+  "children": [
+    {
+      "role": "AXGroup",
+      "title": "Sottotitoli",
+      "description": "Sottotitoli",
+      "subrole": "AXLandmarkRegion",
+      "children": [
+        {
+          "role": "AXGroup",
+          "children": [
+            {
+              "role": "AXGroup",
+              "children": [
+                {
+                  "role": "AXGroup",
+                  "children": [
+                    {
+                      "role": "AXStaticText",
+                      "value": "Tu"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "role": "AXGroup",
+              "children": [
+                {
+                  "role": "AXStaticText",
+                  "value": "Testo di prova."
+                },
+                {
+                  "role": "AXStaticText",
+                  "value": "Testo di prova."
+                },
+                {
+                  "role": "AXStaticText",
+                  "value": "Testo di prova."
+                },
+                {
+                  "role": "AXStaticText",
+                  "value": "Testo di prova."
+                },
+                {
+                  "role": "AXStaticText",
+                  "value": "Testo di prova."
+                },
+                {
+                  "role": "AXStaticText",
+                  "value": "Testo di prova."
+                },
+                {
+                  "role": "AXStaticText",
+                  "value": "Testo di prova."
+                }
+              ]
+            }
+          ],
+          "identifier": "caption-0"
+        }
+      ]
+    },
+    {
+      "role": "AXList",
+      "title": "Partecipanti",
+      "description": "Partecipanti",
+      "subrole": "AXContentList",
+      "children": [
+        {
+          "role": "AXGroup",
+          "title": "Local User",
+          "description": "Local User",
+          "children": [
+            {
+              "role": "AXGroup",
+              "subrole": "AXEmptyGroup"
+            },
+            {
+              "role": "AXStaticText",
+              "value": "Local User"
+            },
+            {
+              "role": "AXStaticText",
+              "value": "(Tu)"
+            },
+            {
+              "role": "AXGroup",
+              "children": [
+                {
+                  "role": "AXStaticText",
+                  "value": "Organizzatore della riunione"
+                }
+              ]
+            },
+            {
+              "role": "AXGroup",
+              "subrole": "AXEmptyGroup",
+              "children": [
+                {
+                  "role": "AXGroup",
+                  "subrole": "AXEmptyGroup",
+                  "children": [
+                    {
+                      "role": "AXGroup",
+                      "subrole": "AXEmptyGroup"
+                    },
+                    {
+                      "role": "AXGroup",
+                      "subrole": "AXEmptyGroup"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "role": "AXGroup",
+              "children": [
+                {
+                  "role": "AXGroup",
+                  "children": [
+                    {
+                      "role": "AXPopUpButton",
+                      "title": "Altre azioni",
+                      "description": "Altre azioni",
+                      "children": [
+                        {
+                          "role": "AXGroup",
+                          "subrole": "AXEmptyGroup"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "role": "AXButton",
+      "title": "Esci dalla chiamata",
+      "description": "Esci dalla chiamata"
+    }
+  ]
+}

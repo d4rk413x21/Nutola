@@ -189,9 +189,11 @@ enum ProcessingPipeline {
         // 2. Speakers — hybrid: Zoom AX timeline + on-device diarization for gaps.
         var turns: [DiarizedTurn]?
         var namedSpeakers = false
+        let participants = archive.platformParticipants(for: id)
+        let explicitIdentity = participants != nil
         let platformEvents = archive.platformSpeakerEvents(for: id)
-            .filter { !ZoomActiveSpeakerReader.isLocalParticipant($0.name) }
-        let roster = archive.zoomRoster(for: id)
+            .filter { explicitIdentity || !ZoomActiveSpeakerReader.isLocalParticipant($0.name) }
+        let roster = participants?.map(\.name) ?? archive.zoomRoster(for: id)
         NutolaConsoleLog.pipeline(
             "speakers meeting=\(id.uuidString.prefix(8)) platformEvents=\(platformEvents.count)"
                 + " roster=\(roster.count) identifySpeakers=\(AppSettings.identifySpeakers)")
@@ -200,9 +202,10 @@ enum ProcessingPipeline {
         if AppSettings.identifySpeakers, hasSystem {
             onProgress(platformEvents.isEmpty ? "Identifying speakers…" : "Identifying speakers (hybrid)…")
             do {
-                let maxSpeakers = meeting.attendees.isEmpty
+                // A browser panel can expose only a visible subset; it is not an upper bound.
+                let maxSpeakers = explicitIdentity ? nil : (meeting.attendees.isEmpty
                     ? (roster.isEmpty ? nil : roster.count)
-                    : meeting.attendees.count
+                    : meeting.attendees.count)
                 diarizedTurns = try await Diarizer.diarize(fileURL: systemURL, maxSpeakers: maxSpeakers)
             } catch {
                 notices.append(MeetingNotice.speakerIdentificationUnavailable)
@@ -215,21 +218,21 @@ enum ProcessingPipeline {
                 let merged = SpeakerTurnMerger.merge(
                     platformEvents: platformEvents,
                     diarized: diarizedTurns,
-                    roster: roster,
-                    attendees: meeting.attendees)
+                    roster: explicitIdentity ? [] : roster,
+                    attendees: explicitIdentity ? [] : meeting.attendees)
                 turns = merged.turns
                 namedSpeakers = merged.hasNamedSpeakers
                 outcome.platformSpeakerAttribution = true
                 NutolaConsoleLog.pipeline(
                     "hybrid timeline: \(merged.turns.map { formatTurnRange(speaker: $0.speaker, start: $0.start, end: $0.end) }.joined(separator: ", "))")
             } else {
-                onProgress("Labeling speakers from Zoom…")
+                onProgress("Labeling speakers from the meeting…")
                 turns = PlatformSpeakerTurnBuilder.turns(
                     from: PlatformSpeakerTurnBuilder.normalized(platformEvents))
                 namedSpeakers = true
                 outcome.platformSpeakerAttribution = true
                 NutolaConsoleLog.pipeline(
-                    "using Zoom timeline only: \(turns?.map { formatTurnRange(speaker: $0.speaker, start: $0.start, end: $0.end) }.joined(separator: ", ") ?? "")")
+                    "using meeting timeline only: \(turns?.map { formatTurnRange(speaker: $0.speaker, start: $0.start, end: $0.end) }.joined(separator: ", ") ?? "")")
             }
         } else if let diarizedTurns {
             turns = diarizedTurns
@@ -252,7 +255,8 @@ enum ProcessingPipeline {
             echoEvidence = nil
         }
 
-        let myName = NSFullUserName().isEmpty ? "Me" : NSFullUserName()
+        let myName = participants?.first(where: \.isLocal)?.name
+            ?? (NSFullUserName().isEmpty ? "Me" : NSFullUserName())
         let (segments, speakers) = SpeakerLabeler.label(
             mic: micOut,
             system: systemOut,

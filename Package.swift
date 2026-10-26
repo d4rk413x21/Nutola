@@ -38,6 +38,7 @@ let package = Package(
             name: "NutolaTests",
             dependencies: ["Nutola"],
             path: "Tests/NutolaTests",
+            resources: [.copy("Fixtures")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]

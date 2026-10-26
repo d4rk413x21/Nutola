@@ -25,6 +25,20 @@ in this repository. Once it finishes, download the **Nutola-preview** artifact a
 
 Open Nutola from Applications and complete the permissions walkthrough.
 
+## Google Meet in Chrome
+
+Record normally, grant Nutola **Accessibility** access, and turn on captions in
+Google Meet. Keep that meeting selected in its Chrome window; Chrome can remain
+behind Nutola. Italian and English Meet layouts are supported. Open Meet's
+**People** panel to read participant names, including the explicit local-user marker.
+
+Nutola uses changing caption labels to identify remote speakers alongside its
+on-device transcription and diarization. Existing or stale captions, another
+meeting tab and ambiguous simultaneous speakers do not supply a name. Missing
+names fall back to anonymous speakers; caption text does not replace the transcript.
+Meet's microphone mute control does not pause Nutola's microphone recording.
+Other browsers retain microphone/system-audio recording without this name integration.
+
 ## Meeting → tasks → Linear
 
 1. Record a meeting from the menu bar, or let meeting detection offer to record it.

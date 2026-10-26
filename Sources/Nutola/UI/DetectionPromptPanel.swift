@@ -795,6 +795,9 @@ private struct RecordingExpandedCardView: View {
         .accessibilityLabel("Minimize")
       }
       .background(CardDragArea(pillPanel: pillPanel, onMoved: onMoved))
+      if let notice = session.speakerTrackingNotice {
+        Text(notice).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+      }
       transcript
       HStack(spacing: 8) {
         Button(action: onAsk) {

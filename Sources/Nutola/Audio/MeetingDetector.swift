@@ -137,6 +137,12 @@ final class MeetingDetector: @unchecked Sendable {
         sourceApp?.lowercased().contains("zoom") == true
     }
 
+    static func isChromeMeetSource(_ sourceApp: String?) -> Bool {
+        guard let name = sourceApp?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) else { return false }
+        return ["chrome", "google chrome", "google meet"].contains(name)
+            || name == "com.google.chrome" || name.hasPrefix("com.google.chrome.helper")
+    }
+
     // MARK: - Internals (all on `queue`)
 
     private func syncProcessList() {

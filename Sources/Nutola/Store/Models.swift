@@ -49,7 +49,7 @@ struct Meeting: Codable, Identifiable, Equatable, Sendable {
     var summaryProvider: String?
     /// User-assigned folder; nil = unfiled (flat Meetings list).
     var folderID: UUID?
-    /// Transcript remote speakers were labeled from Zoom active-speaker events.
+    /// Transcript remote speakers were labeled from meeting-client speaker observations.
     var platformSpeakerAttribution: Bool = false
 
     /// The time to show in the UI for this meeting. Prefer the matched

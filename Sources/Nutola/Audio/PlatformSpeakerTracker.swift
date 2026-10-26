@@ -5,10 +5,8 @@ import Foundation
 /// transcript segments to named participants instead of generic
 /// "Speaker 1..N".
 ///
-/// Today only Zoom is implemented (`ZoomSpeakerTracker`); Meet/Teams/FaceTime
-/// fall back to `NoopSpeakerTracker` (diarization-only). Adding a platform is
-/// a new conformer + a line in `PlatformSpeakerTrackerFactory.forApp(_:)`,
-/// not a change to `RecordingSession`.
+/// Zoom reads native speaker tiles; Google Meet in Chrome reads caption identities.
+/// Unsupported clients keep the on-device diarization path.
 protocol PlatformSpeakerTracker: AnyObject, Sendable {
     /// Called on the main queue whenever the active remote speaker changes.
     @MainActor var onActiveSpeaker: (@MainActor (String?) -> Void)? { get set }
@@ -23,32 +21,45 @@ protocol PlatformSpeakerTracker: AnyObject, Sendable {
 
     /// Thread-safe snapshot of the current participant roster.
     func currentRoster() -> [String]
+    func isLocalParticipant(_ name: String) -> Bool
+    var statusMessage: String? { get }
 
     func start()
     func stop()
+}
+
+extension PlatformSpeakerTracker {
+    func isLocalParticipant(_ name: String) -> Bool { ZoomActiveSpeakerReader.isLocalParticipant(name) }
+    var statusMessage: String? { nil }
+}
+
+enum SpeakerTrackingTarget: Sendable, Equatable {
+    case zoom
+    case googleMeetChrome
 }
 
 /// Chooses a speaker tracker for the detected source app. Returns a no-op
 /// tracker for platforms without an AX/caption reader, so `RecordingSession`
 /// always has *something* conforming and never nil-checks the platform.
 enum PlatformSpeakerTrackerFactory {
-    @MainActor static func forApp(
-        bundleID: String?,
+    @MainActor static func make(
+        target: SpeakerTrackingTarget,
         meetingID: UUID,
         archive: MeetingArchive,
         startDate: Date,
         elapsedOffset: TimeInterval
     ) -> PlatformSpeakerTracker {
-        if MeetingDetector.isZoomSource(bundleID) {
+        switch target {
+        case .zoom:
             return ZoomSpeakerTracker(
                 meetingID: meetingID,
                 archive: archive,
                 startDate: startDate,
                 elapsedOffset: elapsedOffset)
+        case .googleMeetChrome:
+            return GoogleMeetSpeakerTracker(meetingID: meetingID, archive: archive,
+                                            startDate: startDate, elapsedOffset: elapsedOffset)
         }
-        // Meet, Teams, FaceTime, Webex, manual — no AX reader yet.
-        // Diarization + the fallback "Others" speaker carry the load.
-        return NoopSpeakerTracker()
     }
 }
 

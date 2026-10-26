@@ -167,6 +167,7 @@ final class RecordingServiceImpl: RecordingService {
       archive.removeLiveTranscript(for: meetingID)
       archive.removePlatformSpeakerEvents(for: meetingID)
       archive.removeZoomRoster(for: meetingID)
+      archive.removePlatformParticipants(for: meetingID)
     }
     meeting.state = .recording
     meeting.notice = nil

@@ -271,8 +271,8 @@ private struct GeneralSettings: View {
 
     private var accessibilitySettingsDetail: String {
         accessibilityTrusted
-            ? "Allowed — reads Zoom's active speaker to label who said what in the transcript."
-            : "Optional — labels Zoom speakers by name. Click Grant, then enable Nutola under Accessibility."
+            ? "Allowed — reads Zoom speakers and Google Meet captions in Chrome to label who said what in the transcript."
+            : "Optional — labels Zoom speakers and Google Meet captions in Chrome. Click Grant, then enable Nutola under Accessibility."
     }
 
     private var systemAudioOK: Bool? { nil }

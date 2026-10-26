@@ -40,5 +40,7 @@
 	<string>Nutola records the other participants' audio during meetings so both sides of the conversation appear in your transcript.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Nutola matches recordings to your calendar to name meetings and suggest attendee names. Optional.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Nutola adds the action items you choose to Apple Reminders. Optional.</string>
 </dict>
 </plist>

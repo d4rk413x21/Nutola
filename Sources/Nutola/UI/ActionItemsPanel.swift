@@ -210,14 +210,14 @@ struct ActionItemsPanel: View {
 
     private func addToReminders() {
         guard !openItems.isEmpty else { return }
-        let store = EKEventStore()
-        store.requestFullAccessToReminders { granted, error in
+        EKEventStore().requestFullAccessToReminders { granted, error in
             DispatchQueue.main.async {
                 guard granted, error == nil else {
                     remindersError = "Can't access Reminders. Grant access in System Settings."
                         + " → Privacy & Security → Reminders."
                     return
                 }
+                let store = EKEventStore()
                 let reminder = EKReminder(eventStore: store)
                 reminder.title = "Action Items: \(meeting.title)"
                 reminder.notes = openItems.map { item in

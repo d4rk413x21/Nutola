@@ -18,10 +18,10 @@ struct DetectionCoordinatorTests {
         let start = StartRecordingUseCase(
             recordingService: recording,
             meetingRepository: meetings,
-            folderRepository: MeetingFolderStore(),
+            folderRepository: MeetingFolderStore(archive: FolderArchive(root: meetings.archive.root)),
             calendarRepository: MockCalendarRepository(),
             settings: settings,
-            templateOverrides: TemplateOverrideStore(),
+            templateOverrides: TemplateOverrideStore(root: meetings.archive.root),
             availableTemplateNames: { [] })
         let stop = StopRecordingUseCase(
             recordingService: recording,
@@ -106,10 +106,10 @@ struct DetectionCoordinatorTests {
         let start = StartRecordingUseCase(
             recordingService: recording,
             meetingRepository: meetings,
-            folderRepository: MeetingFolderStore(),
+            folderRepository: MeetingFolderStore(archive: FolderArchive(root: meetings.archive.root)),
             calendarRepository: MockCalendarRepository(),
             settings: settings,
-            templateOverrides: TemplateOverrideStore(),
+            templateOverrides: TemplateOverrideStore(root: meetings.archive.root),
             availableTemplateNames: { [] })
         let stop = StopRecordingUseCase(
             recordingService: recording,

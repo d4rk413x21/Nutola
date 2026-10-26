@@ -70,10 +70,10 @@ struct RecordingUseCaseTests {
         let start = StartRecordingUseCase(
             recordingService: recording,
             meetingRepository: meetings,
-            folderRepository: MeetingFolderStore(),
+            folderRepository: MeetingFolderStore(archive: FolderArchive(root: meetings.archive.root)),
             calendarRepository: MockCalendarRepository(),
             settings: MockSettingsRepository(),
-            templateOverrides: TemplateOverrideStore(),
+            templateOverrides: TemplateOverrideStore(root: meetings.archive.root),
             availableTemplateNames: { [] })
 
         let result = await start.execute(sourceApp: "Zoom", calendarEvent: nil)

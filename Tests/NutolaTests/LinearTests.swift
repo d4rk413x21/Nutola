@@ -15,7 +15,8 @@ struct LinearTests {
     }
 
     private func body(_ request: URLRequest) throws -> [String: Any] {
-        try #require(JSONSerialization.jsonObject(with: #require(request.httpBody)) as? [String: Any])
+        let data = try #require(request.httpBody)
+        return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 
     private func issue(_ id: UUID, url: String = "https://linear.app/work/issue/DEV-12/task") -> [String: Any] {
@@ -69,7 +70,7 @@ struct LinearTests {
             let query = try #require(body["query"] as? String)
             calls += 1
             let first = calls == 1 || calls == 3
-            #expect(variables["after"] as? String == first ? nil : "next")
+            #expect(variables["after"] as? String == (first ? nil : "next"))
             let page: [String: Any] = ["nodes": query.contains("NutolaTeams")
                 ? [["id": "t\(calls)", "name": "Team \(calls)", "key": "DEV"]]
                 : [["id": "p\(calls)", "name": "Project \(calls)"]],

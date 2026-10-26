@@ -152,7 +152,7 @@ final class MCPServerTests {
             ])
             let result = response["result"] as! [String: Any]
             let content = result["content"] as! [[String: Any]]
-            #expect(content[0]["text"] as? String == value.2, value.0)
+            #expect(content[0]["text"] as? String == value.2, "\(value.0)")
         }
     }
 

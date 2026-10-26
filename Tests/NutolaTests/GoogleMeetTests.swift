@@ -87,16 +87,16 @@ extension SharedStateTests {
                         "https://meet.google.com@evil.example/abc-defg-hij", "https://meet.google.com/",
                         "https://meet.google.com/lookup/name", "https://example.com/abc-defg-hij",
                         "https://meet.google.com:8443/abc-defg-hij"] {
-                #expect(GoogleMeetSnapshot.roomCode(from: URL(string: url)!) == nil, url)
+                #expect(GoogleMeetSnapshot.roomCode(from: URL(string: url)!) == nil, "\(url)")
             }
         }
 
         @Test func testChromeDetectionDoesNotMatchOtherBrowsers() {
             for source in ["Chrome", "Google Chrome", "Google Meet", "com.google.Chrome", "com.google.Chrome.helper"] {
-                #expect(MeetingDetector.isChromeMeetSource(source), source)
+                #expect(MeetingDetector.isChromeMeetSource(source), "\(source)")
             }
             for source in ["Safari", "Microsoft Edge", "Chrome Beta", "com.google.Chrome.canary", "Chrome Music Player"] {
-                #expect(!(MeetingDetector.isChromeMeetSource(source)), source)
+                #expect(!(MeetingDetector.isChromeMeetSource(source)), "\(source)")
             }
         }
 
@@ -148,7 +148,8 @@ extension SharedStateTests {
         @Test func testTimelineStaysPinnedToItsFirstMeetingRoom() {
             var timeline = GoogleMeetTimeline()
             timeline.observe(snapshot(), at: 0)
-            #expect(!(timeline.observe(snapshot("Other meeting", room: "xyz-abcd-efg"), at: 3)))
+            let accepted = timeline.observe(snapshot("Other meeting", room: "xyz-abcd-efg"), at: 3)
+            #expect(!accepted)
             #expect(timeline.roomCode == code)
             #expect(timeline.events.isEmpty)
         }

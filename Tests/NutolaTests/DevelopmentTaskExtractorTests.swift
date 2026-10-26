@@ -116,7 +116,7 @@ struct DevelopmentTaskExtractorTests {
                 return output
             })
         #expect(result.tasks[0].evidence == segments)
-        #expect(result.transcriptFingerprint == try DevelopmentTaskReview.fingerprint(segments))
+        #expect(try result.transcriptFingerprint == DevelopmentTaskReview.fingerprint(segments))
         #expect(result.tasks[0].owner == nil)
     }
 
@@ -179,9 +179,9 @@ struct DevelopmentTaskExtractorTests {
     @Test func testFingerprintIsStableAfterReloadAndDetectsEditsWithTheSameIDs() throws {
         let original = transcript
         var edited = try JSONDecoder().decode([TranscriptSegment].self, from: JSONEncoder().encode(original))
-        #expect(try DevelopmentTaskReview.fingerprint(original) == try DevelopmentTaskReview.fingerprint(edited))
+        #expect(try DevelopmentTaskReview.fingerprint(original) == DevelopmentTaskReview.fingerprint(edited))
         edited[0].text = "Cancel the refresh work."
-        #expect(try DevelopmentTaskReview.fingerprint(original) != try DevelopmentTaskReview.fingerprint(edited))
+        #expect(try DevelopmentTaskReview.fingerprint(original) != DevelopmentTaskReview.fingerprint(edited))
     }
 
     @Test func testMarkdownIncludesOnlySelectedDraftsAndOriginalEvidence() {

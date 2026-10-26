@@ -8,13 +8,13 @@ struct UseCaseTests {
 
     @Test func testPrepareMeetingCreatesPrepStateMeeting() {
         let meetings = MockMeetingRepository()
-        let folders = MeetingFolderStore()
+        let folders = MeetingFolderStore(archive: FolderArchive(root: meetings.archive.root))
         let settings = MockSettingsRepository()
         let useCase = PrepareMeetingUseCase(
             meetingRepository: meetings,
             folderRepository: folders,
             settings: settings,
-            templateOverrides: TemplateOverrideStore(),
+            templateOverrides: TemplateOverrideStore(root: meetings.archive.root),
             availableTemplateNames: { [] })
 
         let result = useCase.execute(calendarEvent: ArchitectureFixtures.sampleCalendarEvent())
@@ -34,9 +34,9 @@ struct UseCaseTests {
         settings.defaultTemplate = "1-on-1"
         let useCase = PrepareMeetingUseCase(
             meetingRepository: meetings,
-            folderRepository: MeetingFolderStore(),
+            folderRepository: MeetingFolderStore(archive: FolderArchive(root: meetings.archive.root)),
             settings: settings,
-            templateOverrides: TemplateOverrideStore(),
+            templateOverrides: TemplateOverrideStore(root: meetings.archive.root),
             availableTemplateNames: { [] })
 
         guard case .success(let meeting) = useCase.execute(
@@ -50,12 +50,12 @@ struct UseCaseTests {
     @Test func testPrepareMeetingUsesPerEventOverrideWhenAvailable() {
         let meetings = MockMeetingRepository()
         let settings = MockSettingsRepository()
-        let overrides = TemplateOverrideStore()
+        let overrides = TemplateOverrideStore(root: meetings.archive.root)
         let event = ArchitectureFixtures.sampleCalendarEvent(id: "evt-77", title: "Interview with Alex")
         overrides.set(eventID: event.id, templateName: "Interview")
         let useCase = PrepareMeetingUseCase(
             meetingRepository: meetings,
-            folderRepository: MeetingFolderStore(),
+            folderRepository: MeetingFolderStore(archive: FolderArchive(root: meetings.archive.root)),
             settings: settings,
             templateOverrides: overrides,
             availableTemplateNames: { ["Meeting Notes", "Interview", "1-on-1"] })
@@ -72,12 +72,12 @@ struct UseCaseTests {
         let meetings = MockMeetingRepository()
         var settings = MockSettingsRepository()
         settings.defaultTemplate = "Meeting Notes"
-        let overrides = TemplateOverrideStore()
+        let overrides = TemplateOverrideStore(root: meetings.archive.root)
         let event = ArchitectureFixtures.sampleCalendarEvent(id: "evt-88", title: "Standup")
         overrides.set(eventID: event.id, templateName: "Gone")
         let useCase = PrepareMeetingUseCase(
             meetingRepository: meetings,
-            folderRepository: MeetingFolderStore(),
+            folderRepository: MeetingFolderStore(archive: FolderArchive(root: meetings.archive.root)),
             settings: settings,
             templateOverrides: overrides,
             availableTemplateNames: { ["Meeting Notes"] }) // "Gone" no longer exists
@@ -105,9 +105,9 @@ struct UseCaseTests {
         let calendar = MockCalendarRepository()
         let prepare = PrepareMeetingUseCase(
             meetingRepository: meetings,
-            folderRepository: MeetingFolderStore(),
+            folderRepository: MeetingFolderStore(archive: FolderArchive(root: meetings.archive.root)),
             settings: MockSettingsRepository(),
-            templateOverrides: TemplateOverrideStore(),
+            templateOverrides: TemplateOverrideStore(root: meetings.archive.root),
             availableTemplateNames: { [] })
         let useCase = OpenCalendarEventUseCase(
             meetingRepository: meetings,
@@ -123,9 +123,9 @@ struct UseCaseTests {
         let calendar = MockCalendarRepository()
         let prepare = PrepareMeetingUseCase(
             meetingRepository: meetings,
-            folderRepository: MeetingFolderStore(),
+            folderRepository: MeetingFolderStore(archive: FolderArchive(root: meetings.archive.root)),
             settings: MockSettingsRepository(),
-            templateOverrides: TemplateOverrideStore(),
+            templateOverrides: TemplateOverrideStore(root: meetings.archive.root),
             availableTemplateNames: { [] })
         let useCase = OpenCalendarEventUseCase(
             meetingRepository: meetings,
